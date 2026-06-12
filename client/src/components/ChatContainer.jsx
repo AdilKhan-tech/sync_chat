@@ -1,99 +1,90 @@
 import { useChatStore } from "../store/useChatStore";
-import { useAuthStore } from "../store/useAuthStore";
 import { useEffect, useRef } from "react";
 import ChatHeader from "./ChatHeader";
+import BlockStatusBanner from "./BlockStatusBanner";
 import NoChatHistoryPlaceholder from "./NoChatHistoryPlaceholder";
 import MessageInput from "./MessageInput";
 import MessagesLoadingSkeleton from "./MessagesLoadingSkeleton";
+import MessageBubble from "./MessageBubble";
 
 function ChatContainer() {
   const {
     selectedUser,
-    getMessagesByUserId,
+    getMessages,
     messages,
     isMessagesLoading,
     typingUsers,
+    hasMoreMessages,
+    isMessagingBlocked,
   } = useChatStore();
-  const { authUser } = useAuthStore();
+
   const messagesEndRef = useRef(null);
+  const containerRef = useRef(null);
 
   useEffect(() => {
-    getMessagesByUserId(selectedUser?._id);
-  }, [selectedUser, getMessagesByUserId]);
+    getMessages(false);
+  }, [selectedUser]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typingUsers]);
 
-  const isPartnerTyping =
-    selectedUser && typingUsers.includes(String(selectedUser._id));
+  const handleScroll = () => {
+    const el = containerRef.current;
+    if (el?.scrollTop === 0 && hasMoreMessages && !isMessagesLoading) {
+      getMessages(true);
+    }
+  };
+
+  const isTyping = selectedUser && typingUsers.includes(String(selectedUser._id));
 
   return (
     <>
       <ChatHeader />
-      <div className="flex-1 p-4 overflow-y-auto scrollbar-thin">
-        {isMessagesLoading ? (
-          <MessagesLoadingSkeleton />
-        ) : messages.length === 0 ? (
-          <NoChatHistoryPlaceholder name={selectedUser?.fullName} />
-        ) : (
-          <div className="max-w-3xl mx-auto space-y-4 py-2">
-            {messages.map((msg) => {
-              const isOwn = String(msg.senderId) === String(authUser._id);
-              return (
-                <div
-                  key={msg._id}
-                  className={`flex ${isOwn ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-[75%] sm:max-w-[65%] rounded-2xl px-4 py-2.5 shadow-md ${
-                      isOwn
-                        ? "bg-gradient-to-br from-cyan-500 to-cyan-600 text-white rounded-br-md"
-                        : "bg-slate-800 text-slate-100 rounded-bl-md ring-1 ring-slate-700/50"
-                    }`}
-                  >
-                    {msg.image && (
-                      <img
-                        src={msg.image}
-                        alt="Shared"
-                        className="rounded-lg max-h-56 w-full object-cover mb-1"
-                      />
-                    )}
-                    {msg.text && (
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                        {msg.text}
-                      </p>
-                    )}
-                    <p
-                      className={`text-[10px] mt-1 ${
-                        isOwn ? "text-cyan-100/70" : "text-slate-500"
-                      }`}
-                    >
-                      {new Date(msg.timestamp).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </p>
+      <BlockStatusBanner />
+      <div ref={containerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto scrollbar-thin">
+        <div className="p-4 sm:p-6 min-h-full flex flex-col">
+          {hasMoreMessages && (
+            <button type="button" onClick={() => getMessages(true)} className="text-xs text-blue-400 hover:text-blue-300 mx-auto mb-4">
+              Load older messages
+            </button>
+          )}
+          {isMessagesLoading && messages.length === 0 ? (
+            <MessagesLoadingSkeleton />
+          ) : messages.length === 0 ? (
+            <NoChatHistoryPlaceholder name={selectedUser?.fullName} />
+          ) : (
+            <div className="max-w-3xl mx-auto w-full space-y-3 sm:space-y-4 mt-auto">
+              {messages.map((msg, index) => {
+                const showAvatar =
+                  index === 0 ||
+                  String(messages[index - 1]?.senderId) !== String(msg.senderId);
+                return (
+                  <MessageBubble
+                    key={msg._id}
+                    message={msg}
+                    showAvatar={showAvatar}
+                    partner={selectedUser}
+                  />
+                );
+              })}
+              {isTyping && (
+                <div className="flex justify-start">
+                  <div className="bubble-received px-4 py-3.5">
+                    <div className="flex gap-1">
+                      <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce" />
+                      <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce [animation-delay:150ms]" />
+                      <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce [animation-delay:300ms]" />
+                    </div>
                   </div>
                 </div>
-              );
-            })}
-            {isPartnerTyping && (
-              <div className="flex justify-start">
-                <div className="bg-slate-800 rounded-2xl rounded-bl-md px-4 py-3 ring-1 ring-slate-700/50">
-                  <div className="flex gap-1">
-                    <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:0ms]" />
-                    <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:150ms]" />
-                    <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:300ms]" />
-                  </div>
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-        )}
+              )}
+              <div ref={messagesEndRef} className="h-1" />
+            </div>
+          )}
+        </div>
       </div>
-      <MessageInput />
+      {!isMessagingBlocked() && <MessageInput />}
     </>
   );
 }

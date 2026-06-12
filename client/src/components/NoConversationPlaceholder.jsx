@@ -1,16 +1,14 @@
-import { MessageCircleIcon } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 
 function NoConversationPlaceholder() {
   return (
-    <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-      <div className="w-20 h-20 rounded-full bg-cyan-500/10 flex items-center justify-center mb-6">
-        <MessageCircleIcon className="w-9 h-9 text-cyan-400" />
+    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+      <div className="size-16 rounded-2xl theme-chip flex items-center justify-center mb-5">
+        <MessageCircle className="size-8 theme-text-faint" strokeWidth={1.5} />
       </div>
-      <h2 className="text-xl md:text-2xl font-semibold text-slate-100 mb-2">
-        No conversation selected
-      </h2>
-      <p className="text-sm text-slate-400 max-w-sm leading-relaxed">
-        Select a chat from the sidebar to start messaging. Your conversations will appear here.
+      <h3 className="text-base font-medium theme-text mb-1.5">Select a conversation</h3>
+      <p className="text-sm theme-text-muted max-w-[240px] leading-relaxed">
+        Choose a chat from the sidebar or start a new one from Contacts.
       </p>
     </div>
   );

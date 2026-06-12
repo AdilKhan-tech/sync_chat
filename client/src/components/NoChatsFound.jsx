@@ -1,26 +1,29 @@
-import { MessageCircleIcon } from "lucide-react";
+import { MessageSquarePlus } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 
-function NoChatsFound() {
+function NoChatsFound({ message }) {
   const { setActiveTab } = useChatStore();
+
   return (
-    <div className="flex flex-col items-center justify-center py-10 text-center space-y-4">
-      <div className="w-16 h-16 bg-cyan-500/10 rounded-full flex items-center justify-center">
-        <MessageCircleIcon className="w-8 h-8 text-cyan-500" />
+    <div className="flex flex-col items-center justify-center py-14 px-4 text-center animate-fade-in">
+      <div className="size-16 rounded-2xl theme-chip flex items-center justify-center mb-5">
+        <MessageSquarePlus className="size-7 theme-text-faint" strokeWidth={1.5} />
       </div>
-      <div>
-        <h4 className="text-slate-200 font-medium mb-1">No chats found</h4>
-        <p className="text-sm text-slate-400">
-          Start a new conversation by searching for contacts.
-        </p>
-      </div>
-      <button
-        onClick={() => setActiveTab("contacts")}
-        className="px-4 py-2 bg-cyan-500 text-white rounded-md text-sm font-medium hover:bg-cyan-600 transition"
-      >
-        Find Contacts
-      </button>
+      <h4 className="text-sm font-semibold theme-text-secondary mb-1">
+        {message || "No conversations yet"}
+      </h4>
+      {!message && (
+        <>
+          <p className="text-xs text-zinc-500 max-w-[200px] leading-relaxed mb-6">
+            Browse your contacts and start your first chat.
+          </p>
+          <button type="button" onClick={() => setActiveTab("contacts")} className="btn-primary text-xs">
+            Browse contacts
+          </button>
+        </>
+      )}
     </div>
   );
 }
+
 export default NoChatsFound;

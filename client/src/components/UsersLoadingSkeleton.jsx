@@ -1,18 +1,12 @@
 function UsersLoadingSkeleton() {
   return (
-    <div className="space-y-2 p-2">
-      {[1, 2, 3, 4, 5].map((item) => (
-        <div
-          key={item}
-          className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/30 animate-pulse"
-        >
-          {/* Avatar */}
-          <div className="w-12 h-12 rounded-full bg-slate-700 flex-shrink-0" />
-
-          {/* Text Section */}
+    <div className="space-y-2 animate-pulse p-1">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div key={i} className="flex items-center gap-3 p-2.5">
+          <div className="size-11 rounded-full theme-surface-subtle shrink-0" />
           <div className="flex-1 space-y-2">
-            <div className="h-4 w-2/3 bg-slate-700 rounded" />
-            <div className="h-3 w-1/3 bg-slate-700/70 rounded" />
+            <div className="h-3.5 w-2/5 rounded theme-surface-subtle" />
+            <div className="h-3 w-3/5 rounded theme-surface-subtle opacity-70" />
           </div>
         </div>
       ))}

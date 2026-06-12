@@ -1,31 +1,21 @@
-import React from "react";
-
 function MessagesLoadingSkeleton() {
   return (
-    <div className="max-w-3xl mx-auto space-y-6 animate-pulse">
-      
+    <div className="max-w-3xl mx-auto w-full space-y-4 mt-auto animate-pulse">
       {[1, 2, 3, 4, 5].map((i) => (
         <div
           key={i}
           className={`flex ${i % 2 === 0 ? "justify-end" : "justify-start"}`}
         >
           <div
-            className={`rounded-2xl px-4 py-3 max-w-xs w-full ${
-              i % 2 === 0 ? "bg-cyan-700/30" : "bg-slate-700/30"
+            className={`rounded-2xl px-4 py-3 max-w-[60%] w-full theme-surface-subtle ${
+              i % 2 === 0 ? "opacity-80" : "opacity-100"
             }`}
           >
-            {/* text line */}
-            <div className="h-3 w-3/4 bg-slate-400/30 rounded mb-2"></div>
-
-            {/* second line */}
-            <div className="h-3 w-1/2 bg-slate-400/20 rounded"></div>
-
-            {/* time */}
-            <div className="mt-3 h-2 w-16 bg-slate-400/20 rounded"></div>
+            <div className="h-3 w-4/5 rounded theme-chip mb-2" />
+            <div className="h-3 w-2/5 rounded theme-chip opacity-70" />
           </div>
         </div>
       ))}
-
     </div>
   );
 }

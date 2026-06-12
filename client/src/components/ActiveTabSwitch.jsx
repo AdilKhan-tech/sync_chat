@@ -1,33 +1,31 @@
+import { MessageSquare, Users } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 
 function ActiveTabSwitch() {
   const { activeTab, setActiveTab } = useChatStore();
 
-  return (
-    <div className="flex w-full p-2 gap-2">
-      <button
-        onClick={() => setActiveTab("chats")}
-        className={`flex-1 py-2 rounded-md text-sm font-medium transition-all duration-200
-          ${
-            activeTab === "chats"
-              ? "bg-cyan-500/20 text-cyan-400"
-              : "text-slate-400 hover:text-slate-200"
-          }`}
-      >
-        Chats
-      </button>
+  const tabs = [
+    { id: "chats", label: "Chats", icon: MessageSquare },
+    { id: "contacts", label: "Contacts", icon: Users },
+  ];
 
-      <button
-        onClick={() => setActiveTab("contacts")}
-        className={`flex-1 py-2 rounded-md text-sm font-medium transition-all duration-200
-          ${
-            activeTab === "contacts"
-              ? "bg-cyan-500/20 text-cyan-400"
-              : "text-slate-400 hover:text-slate-200"
-          }`}
-      >
-        Contacts
-      </button>
+  return (
+    <div className="px-3 pt-1 pb-2">
+      <div className="flex gap-1 p-1 rounded-xl theme-chip">
+        {tabs.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setActiveTab(id)}
+            className={`tab-pill flex items-center justify-center gap-2 ${
+              activeTab === id ? "tab-pill-active" : "tab-pill-inactive"
+            }`}
+          >
+            <Icon className="size-3.5" />
+            {label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
