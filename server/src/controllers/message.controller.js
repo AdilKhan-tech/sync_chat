@@ -1,6 +1,7 @@
 import Message from "../models/Message.js";
 import User from "../models/User.js";
 import cloudinary from "../lib/cloudinary.js";
+import { getIO } from "../lib/socket.js";
 
 export const getAllContacts = async (req, res) => {
   try {
@@ -24,7 +25,7 @@ export const getMessagesByUserId = async (req, res) => {
         { senderId: myId, receiverId: userToChatId },
         { senderId: userToChatId, receiverId: myId },
       ],
-    });
+    }).sort({ timestamp: 1 });
 
     res.status(200).json(messages);
   } catch (error) {
@@ -38,19 +39,30 @@ export const sendMessage = async (req, res) => {
     const { text, image } = req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
+
+    if (!text?.trim() && !image) {
+      return res.status(400).json({ message: "Message cannot be empty" });
+    }
+
     let imageUrl;
     if (image) {
       const uploadResponse = await cloudinary.uploader.upload(image);
       imageUrl = uploadResponse.secure_url;
     }
+
     const newMessage = new Message({
       senderId,
       receiverId,
-      text,
+      text: text?.trim() || "",
       image: imageUrl,
     });
 
     await newMessage.save();
+
+    const io = getIO();
+    io.to(receiverId.toString()).emit("newMessage", newMessage);
+    io.to(senderId.toString()).emit("newMessage", newMessage);
+
     res.status(201).json(newMessage);
   } catch (error) {
     console.log("Error in newMessage controller:", error.message);
@@ -75,11 +87,31 @@ export const getChatPartners = async (req, res) => {
       ),
     ];
 
-    const chatPartners = await User.find({
-      _id: { $in: chatPartnerIds },
-    }).select("-password");
+    const chatPartnersWithMeta = await Promise.all(
+      chatPartnerIds.map(async (partnerId) => {
+        const user = await User.findById(partnerId).select("-password");
+        const lastMessage = await Message.findOne({
+          $or: [
+            { senderId: loggedInUserId, receiverId: partnerId },
+            { senderId: partnerId, receiverId: loggedInUserId },
+          ],
+        }).sort({ timestamp: -1 });
 
-    res.status(200).json(chatPartners);
+        return { ...user.toObject(), lastMessage };
+      }),
+    );
+
+    chatPartnersWithMeta.sort((a, b) => {
+      const timeA = a.lastMessage?.timestamp
+        ? new Date(a.lastMessage.timestamp).getTime()
+        : 0;
+      const timeB = b.lastMessage?.timestamp
+        ? new Date(b.lastMessage.timestamp).getTime()
+        : 0;
+      return timeB - timeA;
+    });
+
+    res.status(200).json(chatPartnersWithMeta);
   } catch (error) {
     console.log("Error in getChatPartners controller:", error.message);
     res.status(500).json({ error: "Internal server error" });

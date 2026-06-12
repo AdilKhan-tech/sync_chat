@@ -9,7 +9,7 @@ function LoginPage() {
     password: "",
   });
 
-  const { login, isLogginIn } = useAuthStore();
+  const { login, isLoggingIn } = useAuthStore();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -157,10 +157,10 @@ function LoginPage() {
                 {/* Button */}
                 <button
                   type="submit"
-                  disabled={isLogginIn}
+                  disabled={isLoggingIn}
                   className="flex h-14 w-full items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-500 to-fuchsia-500 text-lg font-semibold shadow-lg shadow-cyan-500/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-cyan-500/30 disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  {isLogginIn ? (
+                  {isLoggingIn ? (
                     <Loader2 className="h-6 w-6 animate-spin" />
                   ) : (
                     "Sign In"
