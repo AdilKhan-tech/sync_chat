@@ -1,3 +1,4 @@
+import { Op } from "sequelize";
 import Message from "../models/Message.js";
 import User from "../models/User.js";
 import cloudinary from "../lib/cloudinary.js";
@@ -8,27 +9,81 @@ import {
   filterMessageForUser,
   incrementUnread,
   clearUnread,
+  appendReadReceipt,
+  isDeletedForUser,
 } from "../lib/messageHelpers.js";
 import { extractFirstUrl, fetchLinkPreview } from "../lib/linkPreview.js";
+import { textSearchWhere, toId } from "../lib/sequelizeHelpers.js";
+
+const formatMessage = (message) => {
+  if (!message) return null;
+  const plain = message.get ? message.get({ plain: true }) : { ...message };
+  plain._id = plain.id;
+  if (plain.replyToMessage) {
+    plain.replyTo = {
+      _id: plain.replyToMessage.id,
+      text: plain.replyToMessage.text,
+      senderId: plain.replyToMessage.senderId,
+      image: plain.replyToMessage.image,
+      messageType: plain.replyToMessage.messageType,
+    };
+    delete plain.replyToMessage;
+  }
+  if (plain.sender) {
+    plain.senderId = {
+      _id: plain.sender.id,
+      fullName: plain.sender.fullName,
+      profilePic: plain.sender.profilePic,
+    };
+    delete plain.sender;
+  }
+  if (plain.receiver) {
+    plain.receiverId = {
+      _id: plain.receiver.id,
+      fullName: plain.receiver.fullName,
+      profilePic: plain.receiver.profilePic,
+    };
+    delete plain.receiver;
+  }
+  return plain;
+};
 
 const emitMessage = (event, message, userIds) => {
   const io = getIO();
-  userIds.forEach((id) => io.to(id.toString()).emit(event, message));
+  const formatted = formatMessage(message);
+  userIds.forEach((id) => io.to(String(id)).emit(event, formatted));
 };
 
 const uploadMedia = async (data, resourceType = "image") => {
   if (!data) return null;
-  return cloudinary.uploader.upload(data, {
-    resource_type: resourceType === "auto" ? "auto" : resourceType,
-  });
+
+  try {
+    const result = await cloudinary.uploader.upload(data, {
+      resource_type: resourceType,
+      timeout: 120000,
+    });
+
+    console.log("Cloudinary Upload Success:", result.secure_url);
+
+    return result;
+
+  } catch (error) {
+    console.log("Cloudinary Upload Error:");
+    console.log(error);
+    throw error;
+  }
 };
 
 export const getAllContacts = async (req, res) => {
   try {
-    const users = await User.find({
-      _id: { $ne: req.user._id, $nin: req.user.blockedUsers || [] },
-    }).select("-password");
-    res.status(200).json(users);
+    const blocked = req.user.blockedUsers || [];
+    const users = await User.findAll({
+      where: {
+        id: { [Op.notIn]: [req.user._id, ...blocked] },
+      },
+      attributes: { exclude: ["password", "twoFactorSecret", "resetPasswordToken", "resetPasswordExpires"] },
+    });
+    res.status(200).json(users.map((u) => ({ ...u.get({ plain: true }), _id: u.id })));
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -40,24 +95,33 @@ export const searchMessages = async (req, res) => {
     if (!q?.trim()) return res.status(400).json({ message: "Query required" });
 
     const filter = {
-      $text: { $search: q },
-      $or: [{ senderId: req.user._id }, { receiverId: req.user._id }],
-      isDeleted: { $ne: true },
+      ...textSearchWhere(q.trim()),
+      isDeleted: false,
+      [Op.or]: [{ senderId: req.user._id }, { receiverId: req.user._id }],
     };
     if (userId) {
-      filter.$or = [
-        { senderId: req.user._id, receiverId: userId },
-        { senderId: userId, receiverId: req.user._id },
+      filter[Op.or] = [
+        { senderId: req.user._id, receiverId: toId(userId) },
+        { senderId: toId(userId), receiverId: req.user._id },
       ];
     }
 
-    const messages = await Message.find(filter)
-      .sort({ timestamp: -1 })
-      .limit(50)
-      .populate("senderId", "fullName profilePic")
-      .populate("receiverId", "fullName profilePic");
+    const messages = await Message.findAll({
+      where: filter,
+      order: [["timestamp", "DESC"]],
+      limit: 50,
+      include: [
+        { model: User, as: "sender", attributes: ["id", "fullName", "profilePic"] },
+        { model: User, as: "receiver", attributes: ["id", "fullName", "profilePic"] },
+      ],
+    });
 
-    res.json(messages.map((m) => filterMessageForUser(m, req.user._id)).filter(Boolean));
+    res.json(
+      messages
+        .filter((m) => !isDeletedForUser(m, req.user._id))
+        .map((m) => filterMessageForUser(formatMessage(m), req.user._id))
+        .filter(Boolean),
+    );
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -67,27 +131,39 @@ export const getMessagesByUserId = async (req, res) => {
   try {
     const myId = req.user._id;
     const { id: partnerId } = req.params;
-    const partner = await User.findById(partnerId);
+    const partner = await User.findByPk(partnerId);
     if (!partner) return res.status(404).json({ message: "User not found" });
     const blockStatus = getBlockStatus(req.user, partner, partnerId);
 
     const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
     const before = req.query.before;
 
-    const query = buildDmQuery(myId, partnerId);
+    const where = buildDmQuery(myId, partnerId);
     if (before && before !== "false" && before !== "undefined") {
       const beforeDate = new Date(before);
       if (!Number.isNaN(beforeDate.getTime())) {
-        query.timestamp = { $lt: beforeDate };
+        where.timestamp = { [Op.lt]: beforeDate };
       }
     }
 
-    const messages = await Message.find(query)
-      .sort({ timestamp: -1 })
-      .limit(limit)
-      .populate("replyTo", "text senderId image messageType");
+    const messages = await Message.findAll({
+      where,
+      order: [["timestamp", "DESC"]],
+      limit,
+      include: [
+        {
+          model: Message,
+          as: "replyToMessage",
+          attributes: ["id", "text", "senderId", "image", "messageType"],
+        },
+      ],
+    });
 
-    const sorted = messages.reverse().map((m) => filterMessageForUser(m, myId)).filter(Boolean);
+    const sorted = messages
+      .reverse()
+      .filter((m) => !isDeletedForUser(m, myId))
+      .map((m) => filterMessageForUser(formatMessage(m), myId))
+      .filter(Boolean);
 
     if (!blockStatus.blockedByMe) {
       await clearUnread(User, myId, `user:${partnerId}`);
@@ -113,7 +189,7 @@ export const sendMessage = async (req, res) => {
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
 
-    const receiver = await User.findById(receiverId);
+    const receiver = await User.findByPk(receiverId);
     if (!receiver) return res.status(404).json({ message: "User not found" });
     if (isBlocked(req.user, receiverId)) {
       return res.status(403).json({ message: "You have blocked this user", code: "BLOCKED_BY_ME" });
@@ -153,7 +229,7 @@ export const sendMessage = async (req, res) => {
 
     const newMessage = await Message.create({
       senderId,
-      receiverId,
+      receiverId: toId(receiverId),
       text: text?.trim() || "",
       image: imageUrl,
       fileUrl,
@@ -163,29 +239,51 @@ export const sendMessage = async (req, res) => {
       voiceUrl,
       voiceDuration,
       messageType,
-      replyTo: replyTo || undefined,
+      replyTo: replyTo ? toId(replyTo) : null,
       linkPreview,
       deliveredTo: [{ userId: senderId, readAt: new Date() }],
     });
 
-    if (replyTo) await newMessage.populate("replyTo", "text senderId image messageType");
+    if (replyTo) {
+      await newMessage.reload({
+        include: [
+          {
+            model: Message,
+            as: "replyToMessage",
+            attributes: ["id", "text", "senderId", "image", "messageType"],
+          },
+        ],
+      });
+    }
 
     await incrementUnread(User, receiverId, `user:${senderId}`);
 
+    const formatted = formatMessage(newMessage);
     emitMessage("newMessage", newMessage, [receiverId, senderId]);
-    res.status(201).json(newMessage);
+    res.status(201).json(formatted);
   } catch (error) {
-    console.error("sendMessage:", error.message);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("========== SEND MESSAGE ERROR ==========");
+    console.error(error);
+    console.error("Message:", error.message);
+    console.error("Stack:", error.stack);
+
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      stack:
+        process.env.NODE_ENV === "development"
+          ? error.stack
+          : undefined,
+    });
   }
 };
 
 export const editMessage = async (req, res) => {
   try {
     const { text } = req.body;
-    const message = await Message.findById(req.params.messageId);
+    const message = await Message.findByPk(req.params.messageId);
     if (!message) return res.status(404).json({ message: "Not found" });
-    if (message.senderId.toString() !== req.user._id.toString()) {
+    if (String(message.senderId) !== String(req.user._id)) {
       return res.status(403).json({ message: "Forbidden" });
     }
     const age = Date.now() - new Date(message.timestamp).getTime();
@@ -199,11 +297,9 @@ export const editMessage = async (req, res) => {
     message.linkPreview = url ? await fetchLinkPreview(url) : null;
     await message.save();
 
-    const targets = message.groupId
-      ? []
-      : [message.receiverId, message.senderId];
+    const targets = message.groupId ? [] : [message.receiverId, message.senderId];
     emitMessage("messageUpdated", message, targets);
-    res.json(message);
+    res.json(formatMessage(message));
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -212,47 +308,92 @@ export const editMessage = async (req, res) => {
 export const deleteMessage = async (req, res) => {
   try {
     const { forEveryone } = req.query;
-    const message = await Message.findById(req.params.messageId);
-    if (!message) return res.status(404).json({ message: "Not found" });
 
-    const isSender = message.senderId.toString() === req.user._id.toString();
-    if (forEveryone === "true" && isSender) {
-      const age = Date.now() - new Date(message.timestamp).getTime();
-      if (age > 60 * 60 * 1000) {
-        return res.status(400).json({ message: "Delete for everyone window expired" });
-      }
-      message.isDeleted = true;
-      message.text = "";
-      message.image = null;
-      message.fileUrl = null;
-      message.voiceUrl = null;
-    } else {
-      message.deletedFor.push(req.user._id);
+    const message = await Message.findByPk(req.params.messageId);
+
+    if (!message) {
+      return res.status(404).json({ message: "Not found" });
     }
-    await message.save();
 
-    const targets = message.groupId ? [] : [message.receiverId, message.senderId];
-    emitMessage("messageDeleted", { messageId: message._id, forEveryone: forEveryone === "true" }, targets);
-    res.json({ success: true });
+    const isSender = String(message.senderId) === String(req.user._id);
+
+    if (forEveryone === "true" && isSender) {
+
+      const age = Date.now() - new Date(message.timestamp).getTime();
+
+      if (age > 60 * 60 * 1000) {
+        return res.status(400).json({
+          message: "Delete for everyone window expired"
+        });
+      }
+
+      // Permanent delete from database
+      await message.destroy();
+
+    } else {
+
+      // Delete only for current user
+      message.deletedFor = [
+        ...(message.deletedFor || []),
+        req.user._id
+      ];
+
+      await message.save();
+    }
+
+
+    const targets = message.groupId
+      ? []
+      : [message.receiverId, message.senderId];
+
+
+    const io = getIO();
+
+    targets.forEach((id) =>
+      io.to(String(id)).emit("messageDeleted", {
+        messageId: req.params.messageId,
+        forEveryone: forEveryone === "true",
+      })
+    );
+
+
+    res.json({
+      success: true
+    });
+
+
   } catch (error) {
-    res.status(500).json({ message: error.message });
+
+    console.error("DELETE MESSAGE ERROR:", error);
+
+    res.status(500).json({
+      message: error.message
+    });
+
   }
 };
 
 export const reactToMessage = async (req, res) => {
   try {
     const { emoji } = req.body;
-    const message = await Message.findById(req.params.messageId);
+    const message = await Message.findByPk(req.params.messageId);
     if (!message) return res.status(404).json({ message: "Not found" });
 
-    message.reactions = message.reactions.filter(
-      (r) => r.userId.toString() !== req.user._id.toString(),
+    message.reactions = (message.reactions || []).filter(
+      (r) => String(r.userId) !== String(req.user._id),
     );
     if (emoji) message.reactions.push({ emoji, userId: req.user._id });
     await message.save();
 
     const targets = message.groupId ? [] : [message.receiverId, message.senderId];
-    emitMessage("reactionUpdated", { messageId: message._id, reactions: message.reactions }, targets);
+    getIO()
+      .to(String(targets[0]))
+      .emit("reactionUpdated", { messageId: message.id, reactions: message.reactions });
+    if (targets[1]) {
+      getIO()
+        .to(String(targets[1]))
+        .emit("reactionUpdated", { messageId: message.id, reactions: message.reactions });
+    }
     res.json(message.reactions);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -274,17 +415,16 @@ export const markMessagesRead = async (req, res) => {
     const { partnerId } = req.params;
     const myId = req.user._id;
 
-    await Message.updateMany(
+    await appendReadReceipt(
       {
-        senderId: partnerId,
-        receiverId: myId,
-        "readBy.userId": { $ne: myId },
+        senderId: toId(partnerId),
+        receiverId: toId(myId),
       },
-      { $push: { readBy: { userId: myId, readAt: new Date() } } },
+      myId,
     );
 
     await clearUnread(User, myId, `user:${partnerId}`);
-    getIO().to(partnerId).emit("messagesRead", { readerId: myId, partnerId });
+    getIO().to(String(partnerId)).emit("messagesRead", { readerId: myId, partnerId });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -293,11 +433,21 @@ export const markMessagesRead = async (req, res) => {
 
 export const exportChat = async (req, res) => {
   try {
-    const messages = await Message.find(buildDmQuery(req.user._id, req.params.id))
-      .sort({ timestamp: 1 })
-      .populate("senderId", "fullName");
+    const messages = await Message.findAll({
+      where: buildDmQuery(req.user._id, req.params.id),
+      order: [["timestamp", "ASC"]],
+      include: [{ model: User, as: "sender", attributes: ["id", "fullName"] }],
+    });
     res.setHeader("Content-Disposition", "attachment; filename=chat-export.json");
-    res.json(messages);
+    res.json(
+      messages.map((m) => {
+        const plain = formatMessage(m);
+        if (plain.senderId && typeof plain.senderId === "object") {
+          plain.senderId = { _id: plain.senderId._id, fullName: plain.senderId.fullName };
+        }
+        return plain;
+      }),
+    );
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -307,41 +457,48 @@ export const getChatPartners = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
     const showArchived = req.query.archived === "true";
-    const user = await User.findById(loggedInUserId);
+    const user = await User.findByPk(loggedInUserId);
     const archived = new Set((user.archivedChats || []).map((c) => chatPrefKey(c.chatType, c.chatId)));
     const pinned = new Set((user.pinnedChats || []).map((c) => chatPrefKey(c.chatType, c.chatId)));
 
-    const messages = await Message.find({
-      $or: [{ senderId: loggedInUserId }, { receiverId: loggedInUserId }],
-      groupId: { $exists: false },
+    const messages = await Message.findAll({
+      where: {
+        [Op.or]: [{ senderId: loggedInUserId }, { receiverId: loggedInUserId }],
+        groupId: null,
+      },
     });
 
     const partnerIds = [
       ...new Set(
         messages.map((msg) =>
-          msg.senderId.toString() === loggedInUserId.toString()
-            ? msg.receiverId.toString()
-            : msg.senderId.toString(),
+          String(msg.senderId) === String(loggedInUserId)
+            ? String(msg.receiverId)
+            : String(msg.senderId),
         ),
       ),
     ];
 
     const partners = await Promise.all(
       partnerIds.map(async (partnerId) => {
-        const partner = await User.findById(partnerId).select("-password");
+        const partner = await User.findByPk(partnerId, {
+          attributes: { exclude: ["password", "twoFactorSecret", "resetPasswordToken", "resetPasswordExpires"] },
+        });
         if (!partner || isBlocked(user, partnerId)) return null;
 
-        const lastMessage = await Message.findOne(buildDmQuery(loggedInUserId, partnerId))
-          .sort({ timestamp: -1 });
+        const lastMessage = await Message.findOne({
+          where: buildDmQuery(loggedInUserId, partnerId),
+          order: [["timestamp", "DESC"]],
+        });
 
         const key = `user:${partnerId}`;
-        const unread = user.unreadCounts?.get?.(key) || user.unreadCounts?.[key] || 0;
+        const unread = user.unreadCounts?.[key] || 0;
 
         const muted = isChatMuted(user, partnerId);
         const blockStatus = getBlockStatus(user, partner, partnerId);
+        const partnerPlain = { ...partner.get({ plain: true }), _id: partner.id };
         return {
-          ...partner.toObject(),
-          lastMessage,
+          ...partnerPlain,
+          lastMessage: lastMessage ? formatMessage(lastMessage) : null,
           unread,
           isPinned: pinned.has(chatPrefKey("user", partnerId)),
           isArchived: archived.has(chatPrefKey("user", partnerId)),

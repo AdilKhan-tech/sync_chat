@@ -4,6 +4,8 @@ import { ENV } from "./env.js";
 import User from "../models/User.js";
 import Message from "../models/Message.js";
 import { isDBConnected } from "./db.js";
+import { plainUser, toId } from "./sequelizeHelpers.js";
+import { appendReadReceipt } from "./messageHelpers.js";
 
 let io;
 const onlineUsers = new Map();
@@ -28,10 +30,12 @@ export const initSocket = (httpServer) => {
       const token = parseJwtFromCookie(socket.handshake.headers.cookie);
       if (!token) return next(new Error("Unauthorized"));
       const decoded = jwt.verify(token, ENV.JWT_SECRET);
-      const user = await User.findById(decoded.userId).select("-password");
+      const user = await User.findByPk(decoded.userId, {
+        attributes: { exclude: ["password", "twoFactorSecret", "resetPasswordToken", "resetPasswordExpires"] },
+      });
       if (!user) return next(new Error("Unauthorized"));
-      socket.userId = user._id.toString();
-      socket.user = user;
+      socket.userId = String(user.id);
+      socket.user = plainUser(user);
       next();
     } catch {
       next(new Error("Unauthorized"));
@@ -45,24 +49,26 @@ export const initSocket = (httpServer) => {
       presenceStatus: socket.user.presenceStatus || "online",
     });
 
-    await User.findByIdAndUpdate(socket.userId, {
-      lastSeenAt: new Date(),
-      presenceStatus: "online",
-    });
+    await User.update(
+      { lastSeenAt: new Date(), presenceStatus: "online" },
+      { where: { id: socket.userId } },
+    );
 
     broadcastOnlineUsers();
 
     socket.on("messageDelivered", async ({ messageId }) => {
-      const message = await Message.findById(messageId);
+      const message = await Message.findByPk(messageId);
       if (!message) return;
-      const exists = message.deliveredTo?.some(
-        (d) => d.userId.toString() === socket.userId,
+      const exists = (message.deliveredTo || []).some(
+        (d) => String(d.userId) === socket.userId,
       );
       if (!exists) {
-        message.deliveredTo = message.deliveredTo || [];
-        message.deliveredTo.push({ userId: socket.userId, readAt: new Date() });
+        message.deliveredTo = [
+          ...(message.deliveredTo || []),
+          { userId: toId(socket.userId), readAt: new Date() },
+        ];
         await message.save();
-        io.to(message.senderId.toString()).emit("messageDelivered", {
+        io.to(String(message.senderId)).emit("messageDelivered", {
           messageId,
           userId: socket.userId,
         });
@@ -70,15 +76,14 @@ export const initSocket = (httpServer) => {
     });
 
     socket.on("markRead", async ({ partnerId }) => {
-      const result = await Message.updateMany(
+      const count = await appendReadReceipt(
         {
-          senderId: partnerId,
-          receiverId: socket.userId,
-          "readBy.userId": { $ne: socket.userId },
+          senderId: toId(partnerId),
+          receiverId: toId(socket.userId),
         },
-        { $push: { readBy: { userId: socket.userId, readAt: new Date() } } },
+        socket.userId,
       );
-      if (result.modifiedCount > 0) {
+      if (count > 0) {
         io.to(partnerId).emit("messagesRead", { readerId: socket.userId, partnerId });
       }
     });
@@ -95,17 +100,17 @@ export const initSocket = (httpServer) => {
     });
 
     socket.on("updatePresence", async ({ presenceStatus, customStatus }) => {
-      await User.findByIdAndUpdate(socket.userId, { presenceStatus, customStatus });
+      await User.update({ presenceStatus, customStatus }, { where: { id: socket.userId } });
       onlineUsers.set(socket.userId, { userId: socket.userId, presenceStatus });
       broadcastOnlineUsers();
     });
 
     socket.on("disconnect", async () => {
       onlineUsers.delete(socket.userId);
-      await User.findByIdAndUpdate(socket.userId, {
-        lastSeenAt: new Date(),
-        presenceStatus: "offline",
-      });
+      await User.update(
+        { lastSeenAt: new Date(), presenceStatus: "offline" },
+        { where: { id: socket.userId } },
+      );
       broadcastOnlineUsers();
     });
   });

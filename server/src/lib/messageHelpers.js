@@ -1,49 +1,66 @@
+import { Op } from "sequelize";
+import User from "../models/User.js";
+import { toId } from "./sequelizeHelpers.js";
+
 export const buildDmQuery = (userId, partnerId) => ({
-  groupId: { $exists: false },
-  $or: [
-    { senderId: userId, receiverId: partnerId },
-    { senderId: partnerId, receiverId: userId },
+  groupId: null,
+  [Op.or]: [
+    { senderId: toId(userId), receiverId: toId(partnerId) },
+    { senderId: toId(partnerId), receiverId: toId(userId) },
   ],
-  deletedFor: { $nin: [userId] },
-  isDeleted: { $ne: true },
+  isDeleted: false,
 });
 
+export const isDeletedForUser = (message, userId) =>
+  (message.deletedFor || []).some((id) => String(id) === String(userId));
+
 export const filterMessageForUser = (message, userId) => {
-  const msg = message.toObject ? message.toObject() : { ...message };
-  if (msg.deletedFor?.some((id) => id.toString() === userId.toString())) {
-    return null;
-  }
+  const msg = message.get ? message.get({ plain: true }) : { ...message };
+  msg._id = msg.id ?? msg._id;
+  if (isDeletedForUser(msg, userId)) return null;
   if (msg.isDeleted) {
-    return { ...msg, text: "This message was deleted", image: null, fileUrl: null, voiceUrl: null };
+    return {
+      ...msg,
+      text: "This message was deleted",
+      image: null,
+      fileUrl: null,
+      voiceUrl: null,
+    };
   }
   return msg;
 };
 
-export const incrementUnread = async (User, userId, chatKey) => {
-  const user = await User.findById(userId);
+export const incrementUnread = async (_User, userId, chatKey) => {
+  const user = await User.findByPk(toId(userId));
   if (!user) return;
-  const counts = user.unreadCounts || new Map();
-  const current = counts.get(chatKey) || 0;
-  counts.set(chatKey, current + 1);
+  const counts = { ...(user.unreadCounts || {}) };
+  counts[chatKey] = (counts[chatKey] || 0) + 1;
   user.unreadCounts = counts;
   await user.save();
 };
 
-export const clearUnread = async (User, userId, chatKey) => {
-  const user = await User.findById(userId);
-  if (!user?.unreadCounts) return;
-
-  const count =
-    typeof user.unreadCounts.get === "function"
-      ? user.unreadCounts.get(chatKey)
-      : user.unreadCounts[chatKey];
-
-  if (!count) return;
-
-  if (typeof user.unreadCounts.delete === "function") {
-    user.unreadCounts.delete(chatKey);
-  } else {
-    delete user.unreadCounts[chatKey];
-  }
+export const clearUnread = async (_User, userId, chatKey) => {
+  const user = await User.findByPk(toId(userId));
+  if (!user?.unreadCounts?.[chatKey]) return;
+  const counts = { ...user.unreadCounts };
+  delete counts[chatKey];
+  user.unreadCounts = counts;
   await user.save();
+};
+
+export const appendReadReceipt = async (where, userId) => {
+  const messages = await import("../models/Message.js").then((m) => m.default.findAll({ where }));
+  const myId = toId(userId);
+  const now = new Date();
+
+  await Promise.all(
+    messages.map(async (message) => {
+      const alreadyRead = (message.readBy || []).some((r) => String(r.userId) === String(myId));
+      if (alreadyRead) return;
+      message.readBy = [...(message.readBy || []), { userId: myId, readAt: now }];
+      await message.save();
+    }),
+  );
+
+  return messages.length;
 };

@@ -2,6 +2,7 @@ import { ENV } from "../lib/env.js";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import { isDBConnected } from "../lib/db.js";
+import { plainUser } from "../lib/sequelizeHelpers.js";
 
 export const protectRoute = async (req, res, next) => {
   try {
@@ -19,19 +20,22 @@ export const protectRoute = async (req, res, next) => {
       return res.status(401).json({ message: "Unauthorized - Invalid token" });
     }
 
-    const user = await User.findById(decoded.userId).select("-password");
+    const user = await User.findByPk(decoded.userId, {
+      attributes: { exclude: ["password", "twoFactorSecret", "resetPasswordToken", "resetPasswordExpires"] },
+    });
     if (!user) {
       return res.status(401).json({ message: "Unauthorized - User not found" });
     }
 
-    req.user = user;
+    req.user = plainUser(user);
+    req.userModel = user;
     next();
   } catch (error) {
     if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError") {
       return res.status(401).json({ message: "Unauthorized - Token verification failed" });
     }
 
-    if (error.name === "MongoNetworkError" || error.code === "EPIPE") {
+    if (error.name === "SequelizeConnectionError" || error.code === "EPIPE") {
       console.error("Auth DB network error:", error.message);
       return res.status(503).json({ message: "Database connection lost. Please try again." });
     }

@@ -1,4 +1,3 @@
-import mongoose from "mongoose";
 import User from "../models/User.js";
 import Report from "../models/Report.js";
 import {
@@ -6,9 +5,18 @@ import {
   buildChatPref,
   isChatMuted,
   getBlockStatus,
+  isValidId,
 } from "../lib/userHelpers.js";
+import { toId } from "../lib/sequelizeHelpers.js";
 
-const invalidChatId = (chatId) => !chatId || !mongoose.Types.ObjectId.isValid(chatId);
+const invalidChatId = (chatId) => !chatId || !isValidId(chatId);
+
+const updateUserFields = async (userId, update) => {
+  await User.update(update, { where: { id: userId } });
+  return User.findByPk(userId, {
+    attributes: { exclude: ["password", "twoFactorSecret", "resetPasswordToken", "resetPasswordExpires"] },
+  });
+};
 
 export const updateStatus = async (req, res) => {
   try {
@@ -17,7 +25,7 @@ export const updateStatus = async (req, res) => {
     if (presenceStatus) update.presenceStatus = presenceStatus;
     if (customStatus !== undefined) update.customStatus = customStatus;
 
-    const user = await User.findByIdAndUpdate(req.user._id, update, { new: true }).select("-password");
+    const user = await updateUserFields(req.user._id, update);
     res.json(sanitizeUser(user));
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -30,7 +38,7 @@ export const updateSettings = async (req, res) => {
     const update = {};
     if (theme) update.theme = theme;
 
-    const user = await User.findByIdAndUpdate(req.user._id, update, { new: true }).select("-password");
+    const user = await updateUserFields(req.user._id, update);
     res.json(sanitizeUser(user));
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -39,19 +47,19 @@ export const updateSettings = async (req, res) => {
 
 export const getChatPrefs = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await User.findByPk(req.user._id);
     const muted = {};
     (user.mutedChats || []).forEach((c) => {
       if (isChatMuted(user, c.chatId, c.chatType)) {
-        muted[c.chatId.toString()] = c.mutedUntil;
+        muted[String(c.chatId)] = c.mutedUntil;
       }
     });
 
     res.json({
-      pinned: (user.pinnedChats || []).map((c) => c.chatId.toString()),
-      archived: (user.archivedChats || []).map((c) => c.chatId.toString()),
+      pinned: (user.pinnedChats || []).map((c) => String(c.chatId)),
+      archived: (user.archivedChats || []).map((c) => String(c.chatId)),
       muted,
-      blocked: (user.blockedUsers || []).map((id) => id.toString()),
+      blocked: (user.blockedUsers || []).map((id) => String(id)),
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -60,11 +68,15 @@ export const getChatPrefs = async (req, res) => {
 
 export const getBlockedUsers = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).populate(
-      "blockedUsers",
-      "fullName profilePic email",
-    );
-    res.json(user.blockedUsers || []);
+    const user = await User.findByPk(req.user._id);
+    const blockedIds = user.blockedUsers || [];
+    if (!blockedIds.length) return res.json([]);
+
+    const blocked = await User.findAll({
+      where: { id: blockedIds },
+      attributes: ["id", "fullName", "profilePic", "email"],
+    });
+    res.json(blocked.map((u) => ({ _id: u.id, fullName: u.fullName, profilePic: u.profilePic, email: u.email })));
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -72,7 +84,7 @@ export const getBlockedUsers = async (req, res) => {
 
 export const getBlockStatusForUser = async (req, res) => {
   try {
-    const partner = await User.findById(req.params.id);
+    const partner = await User.findByPk(req.params.id);
     if (!partner) return res.status(404).json({ message: "User not found" });
     res.json(getBlockStatus(req.user, partner));
   } catch (error) {
@@ -83,12 +95,13 @@ export const getBlockStatusForUser = async (req, res) => {
 export const blockUser = async (req, res) => {
   try {
     const targetId = req.params.id;
-    if (targetId === req.user._id.toString()) {
+    if (String(targetId) === String(req.user._id)) {
       return res.status(400).json({ message: "Cannot block yourself" });
     }
-    await User.findByIdAndUpdate(req.user._id, {
-      $addToSet: { blockedUsers: targetId },
-    });
+    const user = await User.findByPk(req.user._id);
+    const blocked = [...new Set([...(user.blockedUsers || []), toId(targetId)])];
+    user.blockedUsers = blocked;
+    await user.save();
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -98,12 +111,12 @@ export const blockUser = async (req, res) => {
 export const unblockUser = async (req, res) => {
   try {
     const targetId = req.params.id;
-    if (!mongoose.Types.ObjectId.isValid(targetId)) {
+    if (!isValidId(targetId)) {
       return res.status(400).json({ message: "Invalid user" });
     }
-    await User.findByIdAndUpdate(req.user._id, {
-      $pull: { blockedUsers: new mongoose.Types.ObjectId(targetId) },
-    });
+    const user = await User.findByPk(req.user._id);
+    user.blockedUsers = (user.blockedUsers || []).filter((id) => String(id) !== String(targetId));
+    await user.save();
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -116,7 +129,7 @@ export const reportUser = async (req, res) => {
     await Report.create({
       reporterId: req.user._id,
       reportedUserId,
-      messageId,
+      messageId: messageId || null,
       reason,
     });
     res.status(201).json({ success: true });
@@ -126,13 +139,23 @@ export const reportUser = async (req, res) => {
 };
 
 const upsertChatPref = async (userId, field, chatId, chatType, extra = {}) => {
+  const user = await User.findByPk(userId);
   const pref = { ...buildChatPref(chatId, chatType), ...extra };
-  await User.findByIdAndUpdate(userId, {
-    $pull: { [field]: { chatId: pref.chatId, chatType } },
-  });
-  await User.findByIdAndUpdate(userId, {
-    $addToSet: { [field]: pref },
-  });
+  const list = (user[field] || []).filter(
+    (c) => !(String(c.chatId) === String(pref.chatId) && c.chatType === pref.chatType),
+  );
+  list.push(pref);
+  user[field] = list;
+  await user.save();
+};
+
+const removeChatPref = async (userId, field, chatId, chatType) => {
+  const user = await User.findByPk(userId);
+  const pref = buildChatPref(chatId, chatType);
+  user[field] = (user[field] || []).filter(
+    (c) => !(String(c.chatId) === String(pref.chatId) && c.chatType === pref.chatType),
+  );
+  await user.save();
 };
 
 export const pinChat = async (req, res) => {
@@ -154,10 +177,7 @@ export const unpinChat = async (req, res) => {
     if (invalidChatId(chatId)) {
       return res.status(400).json({ message: "Invalid chat" });
     }
-    const pref = buildChatPref(chatId, chatType);
-    await User.findByIdAndUpdate(req.user._id, {
-      $pull: { pinnedChats: { chatId: pref.chatId, chatType } },
-    });
+    await removeChatPref(req.user._id, "pinnedChats", chatId, chatType);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -183,10 +203,7 @@ export const unarchiveChat = async (req, res) => {
     if (invalidChatId(chatId)) {
       return res.status(400).json({ message: "Invalid chat" });
     }
-    const pref = buildChatPref(chatId, chatType);
-    await User.findByIdAndUpdate(req.user._id, {
-      $pull: { archivedChats: { chatId: pref.chatId, chatType } },
-    });
+    await removeChatPref(req.user._id, "archivedChats", chatId, chatType);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -213,10 +230,7 @@ export const unmuteChat = async (req, res) => {
     if (invalidChatId(chatId)) {
       return res.status(400).json({ message: "Invalid chat" });
     }
-    const pref = buildChatPref(chatId, chatType);
-    await User.findByIdAndUpdate(req.user._id, {
-      $pull: { mutedChats: { chatId: pref.chatId, chatType } },
-    });
+    await removeChatPref(req.user._id, "mutedChats", chatId, chatType);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -225,7 +239,7 @@ export const unmuteChat = async (req, res) => {
 
 export const getSessions = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select("sessions");
+    const user = await User.findByPk(req.user._id, { attributes: ["sessions"] });
     res.json(user.sessions || []);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -234,9 +248,11 @@ export const getSessions = async (req, res) => {
 
 export const revokeSession = async (req, res) => {
   try {
-    await User.findByIdAndUpdate(req.user._id, {
-      $pull: { sessions: { _id: req.params.sessionId } },
-    });
+    const user = await User.findByPk(req.user._id);
+    user.sessions = (user.sessions || []).filter(
+      (s) => String(s.id) !== String(req.params.sessionId),
+    );
+    await user.save();
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -245,10 +261,12 @@ export const revokeSession = async (req, res) => {
 
 export const getUserProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select("-password");
+    const user = await User.findByPk(req.params.id, {
+      attributes: ["id", "fullName", "profilePic", "lastSeenAt", "presenceStatus", "customStatus"],
+    });
     if (!user) return res.status(404).json({ message: "Not found" });
     res.json({
-      _id: user._id,
+      _id: user.id,
       fullName: user.fullName,
       profilePic: user.profilePic,
       lastSeenAt: user.lastSeenAt,

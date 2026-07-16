@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router";
+import { Routes, Route, Navigate } from "react-router-dom";
 import ChatPage from "./pages/ChatPage";
 import LoginPage from "./pages/LoginPage";
 import SignUpPage from "./pages/SignUpPage";
@@ -12,7 +12,13 @@ import { Toaster } from "react-hot-toast";
 
 function App() {
   const { checkAuth, isCheckingAuth, authUser } = useAuthStore();
-  const { connectSocket, disconnectSocket, setAuthUserId, flushOfflineQueue, loadChatPrefs } = useChatStore();
+  const {
+    connectSocket,
+    disconnectSocket,
+    setAuthUserId,
+    flushOfflineQueue,
+    loadChatPrefs,
+  } = useChatStore();
   const { initTheme, setTheme } = useSettingsStore();
 
   useEffect(() => {
@@ -31,17 +37,37 @@ function App() {
     flushOfflineQueue();
     loadChatPrefs();
     return () => disconnectSocket();
-  }, [authUser, connectSocket, disconnectSocket, setAuthUserId, flushOfflineQueue, loadChatPrefs, setTheme]);
-
+  }, [
+    authUser,
+    connectSocket,
+    disconnectSocket,
+    setAuthUserId,
+    flushOfflineQueue,
+    loadChatPrefs,
+    setTheme,
+  ]);
+  console.log("AUTH USER:", authUser);
   if (isCheckingAuth) return <PageLoader />;
 
   return (
     <div className="app-shell p-0 lg:p-4">
       <Routes>
-        <Route path="/" element={authUser ? <ChatPage /> : <Navigate to="/login" />} />
-        <Route path="/login" element={!authUser ? <LoginPage /> : <Navigate to="/" />} />
-        <Route path="/signup" element={!authUser ? <SignUpPage /> : <Navigate to="/" />} />
-        <Route path="/admin" element={authUser?.isAdmin ? <AdminPage /> : <Navigate to="/" />} />
+        <Route
+          path="/"
+          element={authUser ? <ChatPage /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/login"
+          element={!authUser ? <LoginPage /> : <Navigate to="/" />}
+        />
+        <Route
+          path="/signup"
+          element={!authUser ? <SignUpPage /> : <Navigate to="/" />}
+        />
+        <Route
+          path="/admin"
+          element={authUser?.isAdmin ? <AdminPage /> : <Navigate to="/" />}
+        />
       </Routes>
       <Toaster
         position="top-center"

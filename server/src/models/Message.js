@@ -1,69 +1,114 @@
-import mongoose from "mongoose";
+import { DataTypes } from "sequelize";
+import sequelize from "../config/database.js";
+import { addApiId } from "../lib/sequelizeHelpers.js";
 
-const reactionSchema = new mongoose.Schema(
+const Message = sequelize.define(
+  "Message",
   {
-    emoji: { type: String, required: true },
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
+    },
+    senderId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+    receiverId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    groupId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    messageType: {
+      type: DataTypes.ENUM("text", "image", "file", "voice", "system"),
+      defaultValue: "text",
+    },
+    text: {
+      type: DataTypes.TEXT,
+      defaultValue: "",
+    },
+    image: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    fileUrl: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    fileName: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    fileSize: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    mimeType: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    voiceUrl: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    voiceDuration: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    replyTo: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    reactions: {
+      type: DataTypes.JSON,
+      defaultValue: [],
+    },
+    readBy: {
+      type: DataTypes.JSON,
+      defaultValue: [],
+    },
+    deliveredTo: {
+      type: DataTypes.JSON,
+      defaultValue: [],
+    },
+    editedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    isDeleted: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+    deletedFor: {
+      type: DataTypes.JSON,
+      defaultValue: [],
+    },
+    linkPreview: {
+      type: DataTypes.JSON,
+      allowNull: true,
+    },
+    isEncrypted: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+    encryptedPayload: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    timestamp: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW,
+    },
   },
-  { _id: false },
+  {
+    tableName: "messages",
+    timestamps: false,
+  },
 );
 
-const readReceiptSchema = new mongoose.Schema(
-  {
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    readAt: { type: Date, default: Date.now },
-  },
-  { _id: false },
-);
+addApiId(Message);
 
-const messageSchema = new mongoose.Schema({
-  senderId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-    required: true,
-  },
-  receiverId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-  },
-  groupId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Group",
-  },
-  messageType: {
-    type: String,
-    enum: ["text", "image", "file", "voice", "system"],
-    default: "text",
-  },
-  text: { type: String, default: "" },
-  image: { type: String },
-  fileUrl: { type: String },
-  fileName: { type: String },
-  fileSize: { type: Number },
-  mimeType: { type: String },
-  voiceUrl: { type: String },
-  voiceDuration: { type: Number },
-  replyTo: { type: mongoose.Schema.Types.ObjectId, ref: "Message" },
-  reactions: [reactionSchema],
-  readBy: [readReceiptSchema],
-  deliveredTo: [readReceiptSchema],
-  editedAt: { type: Date },
-  isDeleted: { type: Boolean, default: false },
-  deletedFor: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-  linkPreview: {
-    url: String,
-    title: String,
-    description: String,
-    image: String,
-  },
-  isEncrypted: { type: Boolean, default: false },
-  encryptedPayload: { type: String },
-  timestamp: { type: Date, default: Date.now },
-});
-
-messageSchema.index({ senderId: 1, receiverId: 1, timestamp: -1 });
-messageSchema.index({ groupId: 1, timestamp: -1 });
-messageSchema.index({ text: "text" });
-
-const Message = mongoose.model("Message", messageSchema);
 export default Message;

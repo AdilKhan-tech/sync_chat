@@ -1,70 +1,112 @@
-import mongoose from "mongoose";
+import { DataTypes } from "sequelize";
+import sequelize from "../config/database.js";
+import { addApiId } from "../lib/sequelizeHelpers.js";
 
-const sessionSchema = new mongoose.Schema(
+const User = sequelize.define(
+  "User",
   {
-    sessionId: String,
-    userAgent: String,
-    ip: String,
-    lastActive: { type: Date, default: Date.now },
-  },
-  { _id: true },
-);
-
-const chatPrefSchema = new mongoose.Schema(
-  {
-    chatId: { type: mongoose.Schema.Types.ObjectId, required: true },
-    chatType: { type: String, enum: ["user", "group"], default: "user" },
-    mutedUntil: Date,
-  },
-  { _id: false },
-);
-
-const userSchema = new mongoose.Schema(
-  {
-    fullName: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
+    },
+    fullName: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    email: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true,
+    },
     password: {
-      type: String,
-      minlength: 6,
-      required: function () {
-        return !this.oauthGoogleId;
-      },
+      type: DataTypes.STRING,
+      allowNull: true,
     },
-    profilePic: { type: String, default: "" },
-    oauthGoogleId: { type: String, sparse: true },
-    isAdmin: { type: Boolean, default: false },
-    lastSeenAt: { type: Date, default: Date.now },
+    profilePic: {
+      type: DataTypes.STRING,
+      defaultValue: "",
+    },
+    oauthGoogleId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      unique: true,
+    },
+    isAdmin: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+    lastSeenAt: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW,
+    },
     presenceStatus: {
-      type: String,
-      enum: ["online", "away", "busy", "offline"],
-      default: "offline",
+      type: DataTypes.ENUM("online", "away", "busy", "offline"),
+      defaultValue: "offline",
     },
-    customStatus: { type: String, default: "" },
-    theme: { type: String, enum: ["dark", "light"], default: "dark" },
-    blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-    mutedChats: [chatPrefSchema],
-    pinnedChats: [chatPrefSchema],
-    archivedChats: [chatPrefSchema],
+    customStatus: {
+      type: DataTypes.STRING,
+      defaultValue: "",
+    },
+    theme: {
+      type: DataTypes.ENUM("dark", "light"),
+      defaultValue: "dark",
+    },
+    blockedUsers: {
+      type: DataTypes.JSON,
+      defaultValue: [],
+    },
+    mutedChats: {
+      type: DataTypes.JSON,
+      defaultValue: [],
+    },
+    pinnedChats: {
+      type: DataTypes.JSON,
+      defaultValue: [],
+    },
+    archivedChats: {
+      type: DataTypes.JSON,
+      defaultValue: [],
+    },
     unreadCounts: {
-      type: Map,
-      of: Number,
-      default: {},
+      type: DataTypes.JSON,
+      defaultValue: {},
     },
-    twoFactorEnabled: { type: Boolean, default: false },
-    twoFactorSecret: { type: String, select: false },
-    resetPasswordToken: { type: String, select: false },
-    resetPasswordExpires: { type: Date, select: false },
-    pushSubscriptions: [
-      {
-        endpoint: String,
-        keys: { p256dh: String, auth: String },
-      },
-    ],
-    sessions: [sessionSchema],
-    publicKey: { type: String, default: "" },
+    twoFactorEnabled: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+    twoFactorSecret: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    resetPasswordToken: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    resetPasswordExpires: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    pushSubscriptions: {
+      type: DataTypes.JSON,
+      defaultValue: [],
+    },
+    sessions: {
+      type: DataTypes.JSON,
+      defaultValue: [],
+    },
+    publicKey: {
+      type: DataTypes.STRING,
+      defaultValue: "",
+    },
   },
-  { timestamps: true },
+  {
+    tableName: "users",
+    timestamps: true,
+  },
 );
 
-const User = mongoose.model("User", userSchema);
+addApiId(User);
+
 export default User;

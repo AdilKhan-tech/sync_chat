@@ -1,19 +1,42 @@
-import mongoose from "mongoose";
+import { DataTypes } from "sequelize";
+import sequelize from "../config/database.js";
+import { addApiId } from "../lib/sequelizeHelpers.js";
 
-const reportSchema = new mongoose.Schema(
+const Report = sequelize.define(
+  "Report",
   {
-    reporterId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    reportedUserId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    messageId: { type: mongoose.Schema.Types.ObjectId, ref: "Message" },
-    reason: { type: String, required: true },
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
+    },
+    reporterId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+    reportedUserId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+    messageId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    reason: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
     status: {
-      type: String,
-      enum: ["pending", "reviewed", "resolved"],
-      default: "pending",
+      type: DataTypes.ENUM("pending", "reviewed", "resolved"),
+      defaultValue: "pending",
     },
   },
-  { timestamps: true },
+  {
+    tableName: "reports",
+    timestamps: true,
+  },
 );
 
-const Report = mongoose.model("Report", reportSchema);
+addApiId(Report);
+
 export default Report;

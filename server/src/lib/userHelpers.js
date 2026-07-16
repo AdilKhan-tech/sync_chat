@@ -1,6 +1,6 @@
-import mongoose from "mongoose";
+import { isValidId, toId } from "./sequelizeHelpers.js";
 
-export const normalizeChatId = (chatId) => new mongoose.Types.ObjectId(chatId);
+export const normalizeChatId = (chatId) => toId(chatId);
 
 export const chatPrefKey = (chatType, chatId) =>
   `${chatType}:${chatId?.toString?.() ?? chatId}`;
@@ -11,30 +11,30 @@ export const buildChatPref = (chatId, chatType = "user") => ({
 });
 
 export const isChatMuted = (user, chatId, chatType = "user") => {
-  const id = chatId.toString();
-  const entry = user.mutedChats?.find(
-    (c) => c.chatType === chatType && c.chatId.toString() === id,
+  const id = String(chatId);
+  const entry = (user.mutedChats || []).find(
+    (c) => c.chatType === chatType && String(c.chatId) === id,
   );
   return !!(entry?.mutedUntil && new Date(entry.mutedUntil) > new Date());
 };
 
 export const sanitizeUser = (user) => {
   if (!user) return null;
-  const obj = user.toObject ? user.toObject() : { ...user };
+  const obj = user.get ? user.get({ plain: true }) : { ...user };
+  obj._id = obj.id ?? obj._id;
   delete obj.password;
   delete obj.twoFactorSecret;
   delete obj.resetPasswordToken;
   delete obj.resetPasswordExpires;
-  if (obj.unreadCounts instanceof Map) {
-    obj.unreadCounts = Object.fromEntries(obj.unreadCounts);
-  }
   return obj;
 };
 
 export const isBlocked = (user, otherUserId) =>
-  user.blockedUsers?.some((id) => id.toString() === otherUserId.toString());
+  (user.blockedUsers || []).some((id) => String(id) === String(otherUserId));
 
-export const getBlockStatus = (viewer, partner, partnerId = partner?._id) => ({
+export const getBlockStatus = (viewer, partner, partnerId = partner?._id ?? partner?.id) => ({
   blockedByMe: isBlocked(viewer, partnerId),
-  blockedByThem: partner ? isBlocked(partner, viewer._id) : false,
+  blockedByThem: partner ? isBlocked(partner, viewer._id ?? viewer.id) : false,
 });
+
+export { isValidId };

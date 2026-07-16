@@ -7,6 +7,7 @@ import messageRoutes from "./routes/message.route.js";
 import userRoutes from "./routes/user.route.js";
 import adminRoutes from "./routes/admin.route.js";
 import { connectDB } from "./lib/db.js";
+import "./models/index.js";
 import { ENV } from "./lib/env.js";
 import { initSocket } from "./lib/socket.js";
 import cors from "cors";

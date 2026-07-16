@@ -1,3 +1,4 @@
+import { Op } from "sequelize";
 import { OAuth2Client } from "google-auth-library";
 import cloudinary from "../lib/cloudinary.js";
 import { ENV } from "../lib/env.js";
@@ -25,13 +26,13 @@ export const signup = async (req, res) => {
     if (!emailRegex.test(email)) {
       return res.status(400).json({ message: "Invalid email format" });
     }
-    if (await User.findOne({ email })) {
+    if (await User.findOne({ where: { email } })) {
       return res.status(400).json({ message: "User already exists" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const savedUser = await new User({ fullName, email, password: hashedPassword }).save();
-    generateToken(savedUser._id, res);
+    const savedUser = await User.create({ fullName, email, password: hashedPassword });
+    generateToken(savedUser.id, res);
     return res.status(201).json(formatAuthUser(savedUser));
   } catch (error) {
     console.log("Signup error:", error);
@@ -45,7 +46,7 @@ export const login = async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({ message: "All fields are required" });
     }
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ where: { email } });
     if (!user) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
@@ -59,7 +60,7 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    generateToken(user._id, res);
+    generateToken(user.id, res);
     return res.json(formatAuthUser(user));
   } catch (error) {
     console.log("Login error:", error);
@@ -86,9 +87,10 @@ export const updateProfile = async (req, res) => {
       return res.status(400).json({ message: "Nothing to update" });
     }
 
-    const updatedUser = await User.findByIdAndUpdate(req.user._id, update, {
-      new: true,
-    }).select("-password");
+    await User.update(update, { where: { id: req.user._id } });
+    const updatedUser = await User.findByPk(req.user._id, {
+      attributes: { exclude: ["password", "twoFactorSecret", "resetPasswordToken", "resetPasswordExpires"] },
+    });
     res.status(200).json(formatAuthUser(updatedUser));
   } catch (error) {
     console.log("Update profile error:", error);
@@ -108,7 +110,9 @@ export const googleAuth = async (req, res) => {
     });
     const payload = ticket.getPayload();
     let user = await User.findOne({
-      $or: [{ oauthGoogleId: payload.sub }, { email: payload.email }],
+      where: {
+        [Op.or]: [{ oauthGoogleId: payload.sub }, { email: payload.email }],
+      },
     });
 
     if (!user) {
@@ -123,7 +127,7 @@ export const googleAuth = async (req, res) => {
       await user.save();
     }
 
-    generateToken(user._id, res);
+    generateToken(user.id, res);
     res.json(formatAuthUser(user));
   } catch (error) {
     res.status(401).json({ message: "Google auth failed" });
