@@ -3,11 +3,14 @@ import ChatPage from "./pages/ChatPage";
 import LoginPage from "./pages/LoginPage";
 import SignUpPage from "./pages/SignUpPage";
 import AdminPage from "./pages/AdminPage";
+import StatusPage from "./pages/StatusPage";
 import { useAuthStore } from "./store/useAuthStore";
 import { useChatStore } from "./store/useChatStore";
 import { useSettingsStore } from "./store/useSettingsStore";
+import { useCallStore } from "./store/useCallStore";
 import { useEffect } from "react";
 import PageLoader from "./components/PageLoader";
+import CallModal from "./components/CallModal";
 import { Toaster } from "react-hot-toast";
 
 function App() {
@@ -20,6 +23,7 @@ function App() {
     loadChatPrefs,
   } = useChatStore();
   const { initTheme, setTheme } = useSettingsStore();
+  const initCallSocket = useCallStore((s) => s.initCallSocket);
 
   useEffect(() => {
     initTheme();
@@ -36,6 +40,10 @@ function App() {
     connectSocket();
     flushOfflineQueue();
     loadChatPrefs();
+
+    // Register call signaling listeners AFTER socket connects
+    initCallSocket();
+
     return () => disconnectSocket();
   }, [
     authUser,
@@ -45,8 +53,10 @@ function App() {
     flushOfflineQueue,
     loadChatPrefs,
     setTheme,
+    initCallSocket,
   ]);
-  console.log("AUTH USER:", authUser);
+
+  // console.log("AUTH USER:", authUser);
   if (isCheckingAuth) return <PageLoader />;
 
   return (
@@ -68,6 +78,10 @@ function App() {
           path="/admin"
           element={authUser?.isAdmin ? <AdminPage /> : <Navigate to="/" />}
         />
+        <Route
+          path="/status"
+          element={authUser ? <StatusPage /> : <Navigate to="/login" />}
+        />
       </Routes>
       <Toaster
         position="top-center"
@@ -76,6 +90,7 @@ function App() {
           style: { borderRadius: "10px", fontSize: "13px" },
         }}
       />
+      {authUser && <CallModal />}
     </div>
   );
 }
