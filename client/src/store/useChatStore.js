@@ -16,7 +16,11 @@ const upsertMessage = (messages, message) => {
   const existingIdx = messages.findIndex((m) => String(m._id) === id);
   if (existingIdx >= 0) {
     const updated = [...messages];
-    updated[existingIdx] = { ...updated[existingIdx], ...message, pending: false };
+    updated[existingIdx] = {
+      ...updated[existingIdx],
+      ...message,
+      pending: false,
+    };
     return updated;
   }
   const pendingIdx = messages.findIndex((m) => m.pending);
@@ -31,8 +35,12 @@ const upsertMessage = (messages, message) => {
 const sortChats = (chats) =>
   [...chats].sort((a, b) => {
     if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
-    const tA = a.lastMessage?.timestamp ? new Date(a.lastMessage.timestamp).getTime() : 0;
-    const tB = b.lastMessage?.timestamp ? new Date(b.lastMessage.timestamp).getTime() : 0;
+    const tA = a.lastMessage?.timestamp
+      ? new Date(a.lastMessage.timestamp).getTime()
+      : 0;
+    const tB = b.lastMessage?.timestamp
+      ? new Date(b.lastMessage.timestamp).getTime()
+      : 0;
     return tB - tA;
   });
 
@@ -114,7 +122,8 @@ export const useChatStore = create((set, get) => ({
       blockedUsers: [],
     }),
 
-  isUserBlockedByMe: (chatId) => get().chatPrefs.blocked.includes(String(chatId)),
+  isUserBlockedByMe: (chatId) =>
+    get().chatPrefs.blocked.includes(String(chatId)),
 
   isMessagingBlocked: () => {
     const { blockStatus } = get();
@@ -167,8 +176,12 @@ export const useChatStore = create((set, get) => ({
         state.selectedUser && String(state.selectedUser._id) === id
           ? { ...state.selectedUser, ...user }
           : state.selectedUser,
-      chats: state.chats.map((c) => (String(c._id) === id ? { ...c, ...user } : c)),
-      allContacts: state.allContacts.map((c) => (String(c._id) === id ? { ...c, ...user } : c)),
+      chats: state.chats.map((c) =>
+        String(c._id) === id ? { ...c, ...user } : c,
+      ),
+      allContacts: state.allContacts.map((c) =>
+        String(c._id) === id ? { ...c, ...user } : c,
+      ),
     }));
   },
 
@@ -205,7 +218,9 @@ export const useChatStore = create((set, get) => ({
     socket.on("getOnlineUsers", (ids) => set({ onlineUsers: ids }));
     socket.on("onlineUsersMeta", (meta) => {
       const map = {};
-      meta.forEach((m) => { map[m.userId] = m; });
+      meta.forEach((m) => {
+        map[m.userId] = m;
+      });
       set({ onlineMeta: map });
     });
 
@@ -223,13 +238,20 @@ export const useChatStore = create((set, get) => ({
           get().markMessagesRead(message.senderId);
         }
         get().bumpChatPreview(
-          isSameUser(message.senderId, authUserId) ? message.receiverId : message.senderId,
+          isSameUser(message.senderId, authUserId)
+            ? message.receiverId
+            : message.senderId,
           message,
         );
       } else if (!isSameUser(message.senderId, authUserId)) {
         const key = `user:${message.senderId}`;
         const { unreadCounts, isSoundEnabled } = get();
-        set({ unreadCounts: { ...unreadCounts, [key]: (unreadCounts[key] || 0) + 1 } });
+        set({
+          unreadCounts: {
+            ...unreadCounts,
+            [key]: (unreadCounts[key] || 0) + 1,
+          },
+        });
         if (isSoundEnabled && !get().isChatMuted(message.senderId)) {
           playNotificationSound();
         }
@@ -239,7 +261,9 @@ export const useChatStore = create((set, get) => ({
     });
 
     socket.on("messageUpdated", (msg) => {
-      set({ messages: get().messages.map((m) => (m._id === msg._id ? msg : m)) });
+      set({
+        messages: get().messages.map((m) => (m._id === msg._id ? msg : m)),
+      });
     });
 
     socket.on("messageDeleted", ({ messageId }) => {
@@ -258,11 +282,16 @@ export const useChatStore = create((set, get) => ({
       set({
         messages: get().messages.map((m) => {
           if (m._id !== messageId) return m;
-          const exists = m.deliveredTo?.some((d) => String(d.userId) === String(userId));
+          const exists = m.deliveredTo?.some(
+            (d) => String(d.userId) === String(userId),
+          );
           if (exists) return m;
           return {
             ...m,
-            deliveredTo: [...(m.deliveredTo || []), { userId, readAt: new Date() }],
+            deliveredTo: [
+              ...(m.deliveredTo || []),
+              { userId, readAt: new Date() },
+            ],
           };
         }),
       });
@@ -272,14 +301,22 @@ export const useChatStore = create((set, get) => ({
       const authId = get().authUserId;
       set({
         messages: get().messages.map((m) => {
-          if (!isSameUser(m.senderId, authId) || !isSameUser(m.receiverId, readerId)) {
+          if (
+            !isSameUser(m.senderId, authId) ||
+            !isSameUser(m.receiverId, readerId)
+          ) {
             return m;
           }
-          const alreadyRead = m.readBy?.some((r) => String(r.userId) === String(readerId));
+          const alreadyRead = m.readBy?.some(
+            (r) => String(r.userId) === String(readerId),
+          );
           if (alreadyRead) return m;
           return {
             ...m,
-            readBy: [...(m.readBy || []), { userId: readerId, readAt: new Date() }],
+            readBy: [
+              ...(m.readBy || []),
+              { userId: readerId, readAt: new Date() },
+            ],
           };
         }),
       });
@@ -347,7 +384,10 @@ export const useChatStore = create((set, get) => ({
       res.data.forEach((c) => {
         if (c.unread) counts[`user:${c._id}`] = c.unread;
       });
-      set({ chats: res.data, unreadCounts: { ...get().unreadCounts, ...counts } });
+      set({
+        chats: res.data,
+        unreadCounts: { ...get().unreadCounts, ...counts },
+      });
       get().loadChatPrefs();
     } catch {
       toast.error("Failed to load chats");
@@ -373,10 +413,15 @@ export const useChatStore = create((set, get) => ({
         params.before = messages[0].timestamp;
       }
 
-      const res = await axiosInstance.get(`/messages/${selectedUser._id}`, { params });
+      const res = await axiosInstance.get(`/messages/${selectedUser._id}`, {
+        params,
+      });
       const { messages: msgs, hasMore, blockStatus } = res.data;
 
-      const status = blockStatus || { blockedByMe: false, blockedByThem: false };
+      const status = blockStatus || {
+        blockedByMe: false,
+        blockedByThem: false,
+      };
       set({
         messages: loadMore ? [...msgs, ...messages] : msgs,
         hasMoreMessages: hasMore,
@@ -395,7 +440,9 @@ export const useChatStore = create((set, get) => ({
   searchMessages: async (q) => {
     if (!q?.trim()) return set({ searchResults: [] });
     try {
-      const res = await axiosInstance.get("/messages/search", { params: { q } });
+      const res = await axiosInstance.get("/messages/search", {
+        params: { q },
+      });
       set({ searchResults: res.data });
     } catch {
       toast.error("Search failed");
@@ -420,7 +467,10 @@ export const useChatStore = create((set, get) => ({
     set({ isSendingMessage: true, messages: [...get().messages, optimistic] });
 
     try {
-      const res = await axiosInstance.post(`/messages/send/${selectedUser._id}`, payload);
+      const res = await axiosInstance.post(
+        `/messages/send/${selectedUser._id}`,
+        payload,
+      );
       const withoutTemp = get().messages.filter((m) => m._id !== tempId);
       set({ messages: upsertMessage(withoutTemp, res.data) });
       get().bumpChatPreview(selectedUser._id, res.data);
@@ -451,7 +501,11 @@ export const useChatStore = create((set, get) => ({
   editMessage: async (messageId, text) => {
     try {
       const res = await axiosInstance.put(`/messages/${messageId}`, { text });
-      set({ messages: get().messages.map((m) => (m._id === messageId ? res.data : m)) });
+      set({
+        messages: get().messages.map((m) =>
+          m._id === messageId ? res.data : m,
+        ),
+      });
     } catch (e) {
       toast.error(e.response?.data?.message || "Edit failed");
     }
@@ -459,7 +513,9 @@ export const useChatStore = create((set, get) => ({
 
   deleteMessage: async (messageId, forEveryone = false) => {
     try {
-      await axiosInstance.delete(`/messages/${messageId}`, { params: { forEveryone } });
+      await axiosInstance.delete(`/messages/${messageId}`, {
+        params: { forEveryone },
+      });
       set({ messages: get().messages.filter((m) => m._id !== messageId) });
     } catch {
       toast.error("Delete failed");
@@ -468,7 +524,9 @@ export const useChatStore = create((set, get) => ({
 
   reactToMessage: async (messageId, emoji) => {
     try {
-      const res = await axiosInstance.post(`/messages/${messageId}/react`, { emoji });
+      const res = await axiosInstance.post(`/messages/${messageId}/react`, {
+        emoji,
+      });
       set({
         messages: get().messages.map((m) =>
           m._id === messageId ? { ...m, reactions: res.data } : m,
@@ -499,10 +557,16 @@ export const useChatStore = create((set, get) => ({
     try {
       const archived = get().isChatArchived(chatId);
       if (archived) {
-        await axiosInstance.post("/users/unarchive", { chatId, chatType: "user" });
+        await axiosInstance.post("/users/unarchive", {
+          chatId,
+          chatType: "user",
+        });
         toast.success("Chat unarchived");
       } else {
-        await axiosInstance.post("/users/archive", { chatId, chatType: "user" });
+        await axiosInstance.post("/users/archive", {
+          chatId,
+          chatType: "user",
+        });
         toast.success("Chat archived");
         set({ selectedUser: null });
       }
@@ -519,7 +583,11 @@ export const useChatStore = create((set, get) => ({
         await axiosInstance.post("/users/unmute", { chatId, chatType: "user" });
         toast.success("Notifications unmuted");
       } else {
-        await axiosInstance.post("/users/mute", { chatId, chatType: "user", hours });
+        await axiosInstance.post("/users/mute", {
+          chatId,
+          chatType: "user",
+          hours,
+        });
         toast.success(`Muted for ${hours}h`);
       }
       await get().getMyChatPartners();
@@ -535,7 +603,12 @@ export const useChatStore = create((set, get) => ({
       set({
         blockStatus: { ...get().blockStatus, blockedByMe: true },
       });
-      await Promise.all([get().loadChatPrefs(), get().getMyChatPartners(), get().getAllContacts(), get().getBlockedUsers()]);
+      await Promise.all([
+        get().loadChatPrefs(),
+        get().getMyChatPartners(),
+        get().getAllContacts(),
+        get().getBlockedUsers(),
+      ]);
     } catch (e) {
       toast.error(e.response?.data?.message || "Could not block user");
     }
@@ -548,7 +621,12 @@ export const useChatStore = create((set, get) => ({
       set({
         blockStatus: { ...get().blockStatus, blockedByMe: false },
       });
-      await Promise.all([get().loadChatPrefs(), get().getMyChatPartners(), get().getAllContacts(), get().getBlockedUsers()]);
+      await Promise.all([
+        get().loadChatPrefs(),
+        get().getMyChatPartners(),
+        get().getAllContacts(),
+        get().getBlockedUsers(),
+      ]);
       if (String(get().selectedUser?._id) === String(userId)) {
         get().fetchBlockStatus(userId);
       }
@@ -558,13 +636,19 @@ export const useChatStore = create((set, get) => ({
   },
 
   reportUser: async (reportedUserId, reason, messageId) => {
-    await axiosInstance.post("/users/report", { reportedUserId, reason, messageId });
+    await axiosInstance.post("/users/report", {
+      reportedUserId,
+      reason,
+      messageId,
+    });
     toast.success("Report submitted");
   },
 
   exportChat: async (userId) => {
     const res = await axiosInstance.get(`/messages/export/${userId}`);
-    const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(res.data, null, 2)], {
+      type: "application/json",
+    });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = "syncchat-export.json";

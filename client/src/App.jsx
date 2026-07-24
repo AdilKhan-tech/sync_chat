@@ -28,35 +28,28 @@ function App() {
   useEffect(() => {
     initTheme();
     checkAuth();
-  }, [checkAuth, initTheme]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!authUser) {
       disconnectSocket();
       return;
     }
+
     setAuthUserId(authUser._id);
     if (authUser.theme) setTheme(authUser.theme);
     connectSocket();
     flushOfflineQueue();
     loadChatPrefs();
-
-    // Register call signaling listeners AFTER socket connects
     initCallSocket();
 
-    return () => disconnectSocket();
-  }, [
-    authUser,
-    connectSocket,
-    disconnectSocket,
-    setAuthUserId,
-    flushOfflineQueue,
-    loadChatPrefs,
-    setTheme,
-    initCallSocket,
-  ]);
+    // NOTE: intentionally no cleanup/disconnect here.
+    // Socket should stay alive for the app's lifetime and only
+    // disconnect when authUser becomes null (logout), handled above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUser?._id]);
 
-  // console.log("AUTH USER:", authUser);
   if (isCheckingAuth) return <PageLoader />;
 
   return (
