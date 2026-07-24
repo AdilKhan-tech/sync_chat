@@ -177,6 +177,6 @@ ISC
 
 ## Links
 
-- [Repository](https://github.com/Nasir-code-786/sync-chat)
-- [Issues](https://github.com/Nasir-code-786/sync-chat/issues)
+- [Repository](https://github.com/AdilKhan-tech/sync-chat)
+- [Issues](https://github.com/AdilKhan-tech/sync-chat/issues)
 # sync_chat
