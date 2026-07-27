@@ -326,6 +326,9 @@ export const replyStatus = async (req, res) => {
       ],
     });
 
+    console.log("Sending reply to user:", status.userId);
+    console.log("Reply Data:", completeReply);
+
     getIO().to(String(status.userId)).emit("status:reply", completeReply);
 
     res.status(201).json({

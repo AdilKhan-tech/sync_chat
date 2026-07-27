@@ -1,21 +1,30 @@
 import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { MessageCircle, Mail, Loader2 } from "lucide-react";
+import toast from "react-hot-toast";
+
 import { useAuthStore } from "../store/useAuthStore";
-import { MessageCircle, Lock, Mail, Loader2 } from "lucide-react";
-import { Link } from "react-router";
 import AuthBrandPanel from "../components/AuthBrandPanel";
 
 function LoginPage() {
-  const [formData, setFormData] = useState({ email: "", password: "" });
-  const { login, isLoggingIn } = useAuthStore();
+  const navigate = useNavigate();
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+  const [email, setEmail] = useState("");
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    login(formData);
+  const { sendOtp, isSendingOtp } = useAuthStore();
+
+  const handleOtpLogin = async () => {
+    if (!email.trim()) {
+      return toast.error("Please enter your email");
+    }
+
+    const success = await sendOtp(email);
+
+    if (success) {
+      navigate("/verify-otp", {
+        state: { email },
+      });
+    }
   };
 
   return (
@@ -26,83 +35,72 @@ function LoginPage() {
 
           <div className="flex items-center justify-center p-6 sm:p-10 lg:p-14">
             <div className="w-full max-w-md">
+
               <div className="flex lg:hidden items-center justify-center gap-3 mb-8">
                 <div className="flex items-center justify-center size-11 rounded-lg bg-accent-soft ring-1 ring-accent-ring">
                   <MessageCircle className="size-5 text-accent-muted" />
                 </div>
+
                 <div>
-                  <h1 className="text-xl font-bold tracking-tight">SyncChat</h1>
-                  <p className="text-xs text-zinc-500">Professional messaging</p>
+                  <h1 className="text-xl font-bold">SyncChat</h1>
+                  <p className="text-xs text-zinc-500">
+                    Professional messaging
+                  </p>
                 </div>
               </div>
 
               <div className="mb-8 text-center lg:text-left">
-                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-2 theme-text">
-                  Welcome back
+                <h2 className="text-3xl font-bold theme-text">
+                  Welcome Back
                 </h2>
-                <p className="text-sm theme-text-muted">
-                  Sign in to continue your conversations.
+
+                <p className="text-sm theme-text-muted mt-2">
+                  Enter your email to receive a one-time verification code.
                 </p>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="space-y-6">
                 <div>
-                  <label className="mb-2 block text-sm font-medium theme-text-secondary">
+                  <label className="mb-2 block text-sm font-medium">
                     Email
                   </label>
-                  <div className="relative group">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-zinc-600 group-focus-within:text-blue-400 transition-colors" />
+
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-zinc-500" />
+
                     <input
-                      name="email"
                       type="email"
                       placeholder="you@example.com"
-                      autoComplete="email"
-                      required
-                      value={formData.email}
-                      onChange={handleChange}
-                      className="input-field !pl-11 !h-12"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium theme-text-secondary">
-                    Password
-                  </label>
-                  <div className="relative group">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-zinc-600 group-focus-within:text-blue-400 transition-colors" />
-                    <input
-                      name="password"
-                      type="password"
-                      placeholder="••••••••"
-                      autoComplete="current-password"
-                      required
-                      value={formData.password}
-                      onChange={handleChange}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       className="input-field !pl-11 !h-12"
                     />
                   </div>
                 </div>
 
                 <button
-                  type="submit"
-                  disabled={isLoggingIn}
-                  className="btn-primary w-full !h-12 !text-base"
+                  onClick={handleOtpLogin}
+                  disabled={isSendingOtp}
+                  className="btn-primary w-full h-12"
                 >
-                  {isLoggingIn ? (
+                  {isSendingOtp ? (
                     <Loader2 className="size-5 animate-spin" />
                   ) : (
-                    "Sign in"
+                    "Continue with OTP"
                   )}
                 </button>
-              </form>
+              </div>
 
               <p className="mt-6 text-center text-sm text-zinc-500">
-                Don&apos;t have an account?{" "}
-                <Link to="/signup" className="font-medium text-blue-400 hover:text-blue-300 transition-colors">
+                Don't have an account?{" "}
+                <Link
+                  to="/signup"
+                  className="font-medium text-blue-400 hover:text-blue-300"
+                >
                   Create one
                 </Link>
               </p>
+
             </div>
           </div>
         </div>
