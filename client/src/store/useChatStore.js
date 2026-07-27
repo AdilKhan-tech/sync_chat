@@ -493,7 +493,7 @@ export const useChatStore = create((set, get) => ({
       try {
         await axiosInstance.post(`/messages/send/${item.targetId}`, item);
         removeFromQueue(item.tempId);
-      } catch {}
+      } catch { }
     }
     if (queue.length) toast.success("Queued messages sent");
   },
@@ -673,5 +673,25 @@ export const useChatStore = create((set, get) => ({
     } catch {
       return null;
     }
+  },
+  archivePin: "1234",
+  showArchiveLock: false,
+
+  setShowArchiveLock: (value) =>
+    set({ showArchiveLock: value }),
+
+  verifyArchivePin: (pin) => {
+    const correctPin = get().archivePin;
+
+    if (pin === correctPin) {
+      set({
+        showArchivedChats: true,
+        showArchiveLock: false,
+      });
+
+      return true;
+    }
+
+    return false;
   },
 }));

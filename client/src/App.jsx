@@ -8,6 +8,7 @@ import SignUpPage from "./pages/SignUpPage";
 import AdminPage from "./pages/AdminPage";
 import StatusPage from "./pages/StatusPage";
 import VerifyOtp from "./pages/VerifyOtp";
+import ArchivePinModal from "./components/ArchivePinModal";
 
 import PageLoader from "./components/PageLoader";
 import CallModal from "./components/CallModal";
@@ -144,6 +145,7 @@ function App() {
       />
 
       {authUser && <CallModal />}
+      <ArchivePinModal />
     </div>
   );
 }

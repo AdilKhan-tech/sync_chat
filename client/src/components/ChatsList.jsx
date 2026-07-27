@@ -33,6 +33,7 @@ function ChatsList() {
     typingInList,
     showArchivedChats,
     setShowArchivedChats,
+    setShowArchiveLock,
   } = useChatStore();
 
   useEffect(() => {
@@ -47,18 +48,18 @@ function ChatsList() {
         <button
           type="button"
           onClick={() => setShowArchivedChats(false)}
-          className={`flex-1 text-xs py-1.5 rounded-lg transition-colors ${
-            !showArchivedChats ? "bg-accent-soft text-blue-300" : "text-zinc-500 hover:text-zinc-300"
-          }`}
+          className={`flex-1 text-xs py-1.5 rounded-lg transition-colors ${!showArchivedChats ? "bg-accent-soft text-blue-300" : "text-zinc-500 hover:text-zinc-300"
+            }`}
         >
           Active
         </button>
         <button
           type="button"
-          onClick={() => setShowArchivedChats(true)}
-          className={`flex-1 text-xs py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1 ${
-            showArchivedChats ? "bg-accent-soft text-blue-300" : "text-zinc-500 hover:text-zinc-300"
-          }`}
+          onClick={() => setShowArchiveLock(true)}
+          className={`flex-1 text-xs py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1 ${showArchivedChats
+              ? "bg-accent-soft text-blue-300"
+              : "text-zinc-500 hover:text-zinc-300"
+            }`}
         >
           <Archive className="size-3" />
           Archived
@@ -96,9 +97,8 @@ function ChatsList() {
                         {chat.isMuted && <BellOff className="size-3 text-zinc-500 shrink-0" />}
                         {chat.blockedByThem && <ShieldOff className="size-3 text-amber-400 shrink-0" />}
                         <h4
-                          className={`text-sm truncate ${
-                            unread > 0 && !chat.isMuted ? "font-semibold theme-text" : "font-medium theme-text-secondary"
-                          }`}
+                          className={`text-sm truncate ${unread > 0 && !chat.isMuted ? "font-semibold theme-text" : "font-medium theme-text-secondary"
+                            }`}
                         >
                           {chat.fullName}
                         </h4>
@@ -109,15 +109,14 @@ function ChatsList() {
                     </div>
                     <div className="flex items-center justify-between gap-2 mt-0.5">
                       <p
-                        className={`text-xs truncate ${
-                          isTyping
+                        className={`text-xs truncate ${isTyping
                             ? "text-blue-400"
                             : chat.blockedByThem
                               ? "text-amber-400/80"
                               : unread > 0 && !chat.isMuted
                                 ? "text-zinc-300 font-medium"
                                 : "text-zinc-500"
-                        }`}
+                          }`}
                       >
                         {isTyping
                           ? "typing..."
@@ -127,11 +126,10 @@ function ChatsList() {
                       </p>
                       {unread > 0 && (
                         <span
-                          className={`shrink-0 min-w-[20px] h-5 flex items-center justify-center rounded-full text-[10px] font-bold px-1.5 ${
-                            chat.isMuted
+                          className={`shrink-0 min-w-[20px] h-5 flex items-center justify-center rounded-full text-[10px] font-bold px-1.5 ${chat.isMuted
                               ? "bg-zinc-600 text-zinc-300"
                               : "bg-accent text-white"
-                          }`}
+                            }`}
                         >
                           {unread > 9 ? "9+" : unread}
                         </span>
