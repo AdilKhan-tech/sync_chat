@@ -10,6 +10,8 @@ export const useAuthStore = create((set) => ({
   isLoggingIn: false,
   isLoggingOut: false,
   isUpdatingProfile: false,
+  isSendingOtp: false,
+  isVerifyingOtp: false,
 
   checkAuth: async () => {
     try {
@@ -76,4 +78,56 @@ export const useAuthStore = create((set) => ({
       set({ isUpdatingProfile: false });
     }
   },
+
+  sendOtp: async (email) => {
+  set({ isSendingOtp: true });
+
+  try {
+    await axiosInstance.post("/auth/send-otp", {
+      email,
+    });
+
+    toast.success("OTP sent successfully");
+
+    return true;
+  } catch (error) {
+    toast.error(
+      error.response?.data?.message || "Failed to send OTP"
+    );
+
+    return false;
+  } finally {
+    set({ isSendingOtp: false });
+  }
+},
+
+verifyOtp: async (email, otp) => {
+  set({ isVerifyingOtp: true });
+
+  try {
+    const res = await axiosInstance.post("/auth/verify-otp", {
+      email,
+      otp,
+    });
+
+    set({
+      authUser: res.data.user,
+    });
+
+    toast.success("Login successful");
+
+    return true;
+  } catch (error) {
+    toast.error(
+      error.response?.data?.message || "OTP verification failed"
+    );
+
+    return false;
+  } finally {
+    set({
+      isVerifyingOtp: false,
+    });
+  }
+},
+
 }));

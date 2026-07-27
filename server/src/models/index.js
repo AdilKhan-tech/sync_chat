@@ -1,6 +1,7 @@
 import User from "./User.js";
 import Message from "./Message.js";
 import Report from "./Report.js";
+import Otp from "./Otp.js";
 
 import Status from "./Status.js";
 import StatusView from "./StatusView.js";
@@ -128,4 +129,4 @@ StatusReply.belongsTo(User, {
   foreignKey: "receiverId",
 });
 
-export { User, Message, Report, Status, StatusView, StatusReply };
+export { User, Message, Report, Status, StatusView, StatusReply, Otp };

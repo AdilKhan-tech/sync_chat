@@ -10,21 +10,13 @@ export const useStatusStore = create((set, get) => ({
   // =====================
 
   statuses: [],
-
   myStatus: [],
-
   currentUserStatuses: [],
-
   selectedStatus: null,
-
   viewerOpen: false,
-
   viewers: [],
-
   replies: [],
-
   loading: false,
-
   uploading: false,
 
   // =====================
@@ -33,16 +25,14 @@ export const useStatusStore = create((set, get) => ({
 
   uploadStatus: async (data) => {
     try {
-      set({
-        uploading: true,
-      });
+      set({ uploading: true });
 
       const res = await axiosInstance.post("/status", data);
 
       const newStatus = res.data.status;
 
       set((state) => ({
-        myStatus: [...state.myStatus, newStatus],
+        myStatus: [newStatus, ...state.myStatus],
       }));
 
       toast.success("Status uploaded");
@@ -50,12 +40,9 @@ export const useStatusStore = create((set, get) => ({
       return newStatus;
     } catch (error) {
       console.log(error);
-
       toast.error(error.response?.data?.message || "Upload failed");
     } finally {
-      set({
-        uploading: false,
-      });
+      set({ uploading: false });
     }
   },
 
@@ -81,9 +68,7 @@ export const useStatusStore = create((set, get) => ({
 
   getStatusFeed: async () => {
     try {
-      set({
-        loading: true,
-      });
+      set({ loading: true });
 
       const res = await axiosInstance.get("/status/feed");
 
@@ -93,9 +78,7 @@ export const useStatusStore = create((set, get) => ({
     } catch (error) {
       console.log(error);
     } finally {
-      set({
-        loading: false,
-      });
+      set({ loading: false });
     }
   },
 
@@ -106,7 +89,6 @@ export const useStatusStore = create((set, get) => ({
   openViewer: (status) => {
     set({
       selectedStatus: status,
-
       viewerOpen: true,
     });
   },
@@ -114,9 +96,7 @@ export const useStatusStore = create((set, get) => ({
   closeViewer: () => {
     set({
       viewerOpen: false,
-
       selectedStatus: null,
-
       currentUserStatuses: [],
     });
   },
@@ -194,12 +174,21 @@ export const useStatusStore = create((set, get) => ({
       await axiosInstance.delete(`/status/${statusId}`);
 
       set((state) => ({
-        myStatus: state.myStatus.filter((item) => item.id !== statusId),
+        myStatus: state.myStatus.filter(
+          (item) => Number(item.id) !== Number(statusId)
+        ),
+        statuses: state.statuses.filter(
+          (item) => Number(item.id) !== Number(statusId)
+        ),
+        currentUserStatuses: state.currentUserStatuses.filter(
+          (item) => Number(item.id) !== Number(statusId)
+        ),
       }));
 
       toast.success("Status deleted");
     } catch (error) {
       console.log(error);
+      toast.error(error.response?.data?.message || "Failed to delete status");
     }
   },
 
@@ -213,11 +202,8 @@ export const useStatusStore = create((set, get) => ({
     if (!socket) return;
 
     socket.off("status:new");
-
     socket.off("status:view");
-
     socket.off("status:reply");
-
     socket.off("status:delete");
 
     socket.on("status:new", (status) => {
@@ -238,7 +224,15 @@ export const useStatusStore = create((set, get) => ({
 
     socket.on("status:delete", ({ statusId }) => {
       set((state) => ({
-        statuses: state.statuses.filter((item) => item.id !== statusId),
+        statuses: state.statuses.filter(
+          (item) => Number(item.id) !== Number(statusId)
+        ),
+        myStatus: state.myStatus.filter(
+          (item) => Number(item.id) !== Number(statusId)
+        ),
+        currentUserStatuses: state.currentUserStatuses.filter(
+          (item) => Number(item.id) !== Number(statusId)
+        ),
       }));
     });
   },

@@ -5,6 +5,8 @@ import {
   logout,
   updateProfile,
   googleAuth,
+  sendOtp,
+  verifyOtp,
 } from "../controllers/auth.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 import { arcjetProtection } from "../middleware/arcjet.middleware.js";
@@ -17,6 +19,8 @@ router.post("/login", arcjetProtection, login);
 router.post("/logout", arcjetProtection, logout);
 router.post("/google", arcjetProtection, googleAuth);
 router.put("/update-profile", protectRoute, updateProfile);
+router.post("/send-otp", arcjetProtection, sendOtp);
+router.post("/verify-otp", arcjetProtection, verifyOtp);
 router.get("/check", protectRoute, (req, res) => {
   res.status(200).json(sanitizeUser(req.user));
 });
