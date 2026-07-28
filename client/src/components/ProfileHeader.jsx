@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Camera, LogOut, Volume2, VolumeX, Plus, Eye } from "lucide-react";
+import { Camera, LogOut, Volume2, VolumeX, Plus, Eye, Settings } from "lucide-react";
 
 import { useNavigate } from "react-router-dom";
 
@@ -135,11 +135,10 @@ function ProfileHeader() {
 
                 if (enabled) playKeystrokeSound();
               }}
-              className={`icon-btn ${
-                isSoundEnabled
-                  ? "text-blue-400 ring-1 ring-accent-ring bg-accent-soft"
-                  : ""
-              }`}
+              className={`icon-btn ${isSoundEnabled
+                ? "text-blue-400 ring-1 ring-accent-ring bg-accent-soft"
+                : ""
+                }`}
             >
               {isSoundEnabled ? (
                 <Volume2 className="size-4" />
@@ -236,6 +235,27 @@ function ProfileHeader() {
               </button>
             </div>
           </div>
+          <button
+            onClick={() => navigate("/settings")}
+            className="
+    mt-5
+    w-full
+    flex
+    items-center
+    justify-center
+    gap-2
+    px-3
+    py-3
+    rounded-lg
+    bg-base-200
+    text-sm
+    hover:bg-base-300
+    transition
+  "
+          >
+            <Settings className="size-5" />
+            Go To Settings
+          </button>
         </div>
       </div>
     </div>
