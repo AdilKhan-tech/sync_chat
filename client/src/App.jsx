@@ -9,6 +9,7 @@ import AdminPage from "./pages/AdminPage";
 import StatusPage from "./pages/StatusPage";
 import VerifyOtp from "./pages/VerifyOtp";
 import ArchivePinModal from "./components/ArchivePinModal";
+import SettingsPage from "./pages/SettingsPage";
 
 import PageLoader from "./components/PageLoader";
 import CallModal from "./components/CallModal";
@@ -130,6 +131,11 @@ function App() {
               <Navigate to="/" replace />
             )
           }
+        />
+
+        <Route
+          path="/settings"
+          element={authUser ? <SettingsPage /> : <Navigate to="/login" />}
         />
       </Routes>
 
