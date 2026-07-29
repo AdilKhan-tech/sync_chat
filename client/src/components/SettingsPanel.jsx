@@ -82,9 +82,6 @@ function SettingsPanel() {
           <section>
             <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-3">Account</h3>
             <p className="text-sm theme-text-muted">{authUser?.email}</p>
-            {authUser?.isAdmin && (
-              <a href="/admin" className="btn-primary w-full text-sm mt-3 inline-flex justify-center">Admin Dashboard</a>
-            )}
           </section>
         </div>
       </div>
