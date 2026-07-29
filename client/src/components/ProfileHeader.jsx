@@ -238,24 +238,30 @@ function ProfileHeader() {
           <button
             onClick={() => navigate("/settings")}
             className="
-    mt-5
-    w-full
-    flex
-    items-center
-    justify-center
-    gap-2
-    px-3
-    py-3
-    rounded-lg
-    bg-base-200
-    text-sm
-    hover:bg-base-300
-    transition
-  "
+              mt-5
+              w-full
+              flex
+              items-center
+              justify-center
+              gap-2
+              px-3
+              py-3
+              rounded-lg
+              bg-base-200
+              text-sm
+              hover:bg-base-300
+              transition
+            "
           >
             <Settings className="size-5" />
             Go To Settings
           </button>
+
+          <section>
+            {authUser?.isAdmin && (
+              <a href="/admin" className="btn-primary w-full text-sm mt-3 inline-flex justify-center">Admin Dashboard</a>
+            )}
+          </section>
         </div>
       </div>
     </div>
