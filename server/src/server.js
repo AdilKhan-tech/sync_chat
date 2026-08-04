@@ -17,7 +17,7 @@ const app = express();
 const __dirname = path.resolve();
 const httpServer = createServer(app);
 
-const PORT = ENV.PORT || 3000;
+const PORT = ENV.PORT || 5000;
 
 // CORS FIRST — before body parsers, so error responses also get CORS headers
 app.use(cors({ origin: ENV.CLIENT_URL, credentials: true }));
