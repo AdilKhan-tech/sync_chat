@@ -34,6 +34,17 @@ app.use("/api/status", statusRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/admin", adminRoutes);
 
+app.get("/", (req, res) => {
+  res.send("Backend Running");
+});
+
+app.get("/test", (req, res) => {
+  res.json({
+    success: true,
+    message: "API Working",
+  });
+});
+
 if (ENV.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../client/dist")));
   app.get("*", (_, res) => {
@@ -54,18 +65,6 @@ const startServer = async () => {
     console.error("Failed to start server:", error.message);
     process.exit(1);
   }
-
-
-  app.get("/", (req, res) => {
-  res.send("Backend Running");
-});
-
-app.get("/test", (req, res) => {
-  res.json({
-    success: true,
-    message: "API Working",
-  });
-});
 };
 
 startServer();
