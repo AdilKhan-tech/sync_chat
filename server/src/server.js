@@ -54,6 +54,18 @@ const startServer = async () => {
     console.error("Failed to start server:", error.message);
     process.exit(1);
   }
+
+
+  app.get("/", (req, res) => {
+  res.send("Backend Running");
+});
+
+app.get("/test", (req, res) => {
+  res.json({
+    success: true,
+    message: "API Working",
+  });
+});
 };
 
 startServer();
