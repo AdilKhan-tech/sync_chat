@@ -3,7 +3,7 @@ import { io } from "socket.io-client";
 const SOCKET_URL =
   import.meta.env.MODE === "development"
     ? "http://localhost:5000"
-    : "https://syncchatbackend-vtgo2jo4.b4a.run";
+    : import.meta.env.VITE_API_URL.replace("/api", "");
 
 let socket = null;
 
