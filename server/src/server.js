@@ -1,68 +1,101 @@
 import express from "express";
 import cookieParser from "cookie-parser";
-import path from "path";
 import { createServer } from "http";
+import cors from "cors";
+
 import authRoutes from "./routes/auth.route.js";
 import messageRoutes from "./routes/message.route.js";
 import userRoutes from "./routes/user.route.js";
 import statusRoutes from "./routes/status.route.js";
 import adminRoutes from "./routes/admin.route.js";
+
 import { connectDB } from "./lib/db.js";
-import "./models/index.js";
 import { ENV } from "./lib/env.js";
 import { initSocket } from "./lib/socket.js";
-import cors from "cors";
+
+import "./models/index.js";
 
 const app = express();
-const __dirname = path.resolve();
 const httpServer = createServer(app);
 
 const PORT = ENV.PORT || 5000;
 
-// CORS FIRST — before body parsers, so error responses also get CORS headers
-app.use(cors({ origin: ENV.CLIENT_URL, credentials: true }));
+// ======================
+// CORS
+// ======================
+app.use(
+  cors({
+    origin: ENV.CLIENT_URL,
+    credentials: true,
+  })
+);
 
-// Increase limits for base64 video/image uploads
+// ======================
+// Middlewares
+// ======================
 app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
-
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use(cookieParser());
 
+// ======================
+// Health Routes
+// ======================
+app.get("/", (req, res) => {
+  res.status(200).send("Backend Running");
+});
+
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Backend Running",
+    port: PORT,
+    environment: ENV.NODE_ENV,
+  });
+});
+
+app.get("/test", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "API Working",
+  });
+});
+
+// ======================
+// API Routes
+// ======================
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/status", statusRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/admin", adminRoutes);
 
-app.get("/", (req, res) => {
-  res.send("Backend Running");
-});
-
-app.get("/test", (req, res) => {
-  res.json({
-    success: true,
-    message: "API Working",
-  });
-});
-
-if (ENV.NODE_ENV === "production") {
-  app.use(express.static(path.join(__dirname, "../client/dist")));
-  app.get("*", (_, res) => {
-    res.sendFile(path.join(__dirname, "../client", "dist", "index.html"));
-  });
-}
-
+// ======================
+// Socket.io
+// ======================
 initSocket(httpServer);
 
+// ======================
+// Start Server
+// ======================
 const startServer = async () => {
   try {
+    console.log("==================================");
+    console.log("Starting SyncChat Backend...");
+    console.log("PORT:", PORT);
+    console.log("NODE_ENV:", ENV.NODE_ENV);
+    console.log("CLIENT_URL:", ENV.CLIENT_URL);
+    console.log("==================================");
+
     await connectDB();
 
-    httpServer.listen(PORT, () => {
+    console.log("Database Connected Successfully");
+
+    httpServer.listen(PORT, "0.0.0.0", () => {
       console.log(`Server is running on port ${PORT}`);
     });
   } catch (error) {
-    console.error("Failed to start server:", error.message);
+    console.error("Server Startup Error:");
+    console.error(error);
     process.exit(1);
   }
 };
