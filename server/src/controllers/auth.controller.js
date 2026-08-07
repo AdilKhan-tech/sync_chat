@@ -111,33 +111,65 @@ export const sendOtp = async (req, res) => {
       to: email,
       subject: "Your Sync Chat Verification Code",
       html: `
-    <div style="font-family: Arial, sans-serif; background-color:#f4f4f7; padding:40px 20px; text-align:center;">
-      <div style="max-width:480px; margin:0 auto; background:#ffffff; border-radius:10px; padding:40px 30px; box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-        
-        <h2 style="color:#333333; margin-bottom:10px;">Sync Chat</h2>
-        <p style="color:#666666; font-size:15px; margin-bottom:30px;">Your verification code</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f7; padding:40px 20px; font-family:Arial, sans-serif;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,0.06);">
+            
+            <!-- Header -->
+            <tr>
+              <td style="background:linear-gradient(135deg,#4F46E5,#7C3AED); padding:28px 30px; text-align:center;">
+                <h1 style="color:#ffffff; font-size:22px; margin:0; letter-spacing:0.5px;">Sync Chat</h1>
+              </td>
+            </tr>
 
-        <h1 style="letter-spacing:8px; color:#4F46E5; font-size:36px; margin:0 0 30px 0;">
-          ${otp}
-        </h1>
+            <!-- Body -->
+            <tr>
+              <td style="padding:40px 35px; text-align:center;">
+                <p style="color:#333333; font-size:16px; margin:0 0 6px 0;">Verify your identity</p>
+                <p style="color:#888888; font-size:14px; margin:0 0 28px 0;">Use the code below to complete your login</p>
 
-        <p style="color:#666666; font-size:14px; margin-bottom:8px;">
-          This code will expire in <strong>5 minutes</strong>.
-        </p>
-        <p style="color:#999999; font-size:13px; margin-top:20px;">
-          If you didn't request this code, you can safely ignore this email.
-        </p>
+                <div style="display:inline-block; background:#F5F3FF; border:1px solid #E0DAFB; border-radius:10px; padding:16px 32px; margin-bottom:28px;">
+                  <span style="font-size:34px; font-weight:bold; letter-spacing:10px; color:#4F46E5;">
+                    ${otp}
+                  </span>
+                </div>
 
-        <hr style="border:none; border-top:1px solid #eeeeee; margin:30px 0;">
+                <p style="color:#666666; font-size:14px; margin:0 0 4px 0;">
+                  This code expires in <strong>5 minutes</strong>.
+                </p>
+                <p style="color:#999999; font-size:13px; margin:0;">
+                  Didn't request this? You can safely ignore this email.
+                </p>
+              </td>
+            </tr>
 
-        <p style="color:#aaaaaa; font-size:12px;">
-          &copy; ${new Date().getFullYear()} Sync Chat. All rights reserved.
-        </p>
-      </div>
-    </div>
+            <!-- Divider -->
+            <tr>
+              <td style="padding:0 35px;">
+                <hr style="border:none; border-top:1px solid #eeeeee; margin:0;">
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td style="padding:24px 35px; text-align:center;">
+                <p style="color:#aaaaaa; font-size:12px; margin:0 0 4px 0;">
+                  Sent by Sync Chat &middot; Khosti Group Of Companies
+                </p>
+                <p style="color:#cccccc; font-size:11px; margin:0;">
+                  &copy; ${new Date().getFullYear()} Sync Chat. All rights reserved.
+                </p>
+              </td>
+            </tr>
+
+          </table>
+        </td>
+      </tr>
+    </table>
   `,
     });
-    
+
     return res.json({
       success: true,
       message: "OTP sent successfully",
