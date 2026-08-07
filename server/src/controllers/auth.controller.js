@@ -107,27 +107,37 @@ export const sendOtp = async (req, res) => {
     console.log("OTP:", otp);
 
     await transporter.sendMail({
-      from: process.env.EMAIL_USER,
+      from: `"Sync Chat" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: "Sync Chat Login OTP",
+      subject: "Your Sync Chat Verification Code",
       html: `
-        <div style="font-family:Arial;padding:20px">
-          <h2>Sync Chat</h2>
+    <div style="font-family: Arial, sans-serif; background-color:#f4f4f7; padding:40px 20px; text-align:center;">
+      <div style="max-width:480px; margin:0 auto; background:#ffffff; border-radius:10px; padding:40px 30px; box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        
+        <h2 style="color:#333333; margin-bottom:10px;">Sync Chat</h2>
+        <p style="color:#666666; font-size:15px; margin-bottom:30px;">Your verification code</p>
 
-          <p>Your verification code is</p>
+        <h1 style="letter-spacing:8px; color:#4F46E5; font-size:36px; margin:0 0 30px 0;">
+          ${otp}
+        </h1>
 
-          <h1 style="letter-spacing:5px">
-            ${otp}
-          </h1>
+        <p style="color:#666666; font-size:14px; margin-bottom:8px;">
+          This code will expire in <strong>5 minutes</strong>.
+        </p>
+        <p style="color:#999999; font-size:13px; margin-top:20px;">
+          If you didn't request this code, you can safely ignore this email.
+        </p>
 
-          <p>
-            This code will expire in
-            5 minutes.
-          </p>
-        </div>
-      `,
+        <hr style="border:none; border-top:1px solid #eeeeee; margin:30px 0;">
+
+        <p style="color:#aaaaaa; font-size:12px;">
+          &copy; ${new Date().getFullYear()} Sync Chat. All rights reserved.
+        </p>
+      </div>
+    </div>
+  `,
     });
-
+    
     return res.json({
       success: true,
       message: "OTP sent successfully",
