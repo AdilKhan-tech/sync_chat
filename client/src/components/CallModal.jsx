@@ -26,113 +26,76 @@ const CallModal = () => {
     toggleCamera,
   } = useCallStore();
 
-  useEffect(() => {
-  if (!remoteStreamUrl) return;
-
-  console.log("REMOTE STREAM OBJECT:", remoteStreamUrl);
-  console.log(
-    "VIDEO TRACKS:",
-    remoteStreamUrl.getVideoTracks().map((t) => ({
-      enabled: t.enabled,
-      readyState: t.readyState,
-      muted: t.muted,
-    }))
-  );
-}, [remoteStreamUrl]);
-
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const remoteAudioRef = useRef(null);
 
-  useEffect(() => {
-  if (!remoteVideoRef.current || !remoteStreamUrl) return;
-
-  console.log("REMOTE STREAM:", remoteStreamUrl);
-
-  console.log(
-    "VIDEO TRACKS:",
-    remoteStreamUrl.getVideoTracks().map((t) => ({
-      enabled: t.enabled,
-      readyState: t.readyState,
-      muted: t.muted,
-    }))
-  );
-
-  remoteVideoRef.current.srcObject = remoteStreamUrl;
-
-  remoteVideoRef.current.onloadedmetadata = () => {
-    console.log("VIDEO SIZE");
-    console.log("Width:", remoteVideoRef.current.videoWidth);
-    console.log("Height:", remoteVideoRef.current.videoHeight);
-
-    remoteVideoRef.current.play();
-  };
-}, [remoteStreamUrl]);
-
-  // Local Video
+  // Local video
   useEffect(() => {
     if (!localVideoRef.current || !localStreamUrl) return;
-
     localVideoRef.current.srcObject = localStreamUrl;
-
-    localVideoRef.current
-      .play()
-      .catch((err) => console.log("Local Play Error:", err));
+    localVideoRef.current.play().catch((err) => console.log("Local Play Error:", err));
   }, [localStreamUrl]);
 
-  // Remote Video / Audio
+  // Remote video + audio — SINGLE effect, no duplicates.
+  // Depends on callType too, so it re-runs once the <video> tag actually mounts.
   useEffect(() => {
     if (!remoteStreamUrl) return;
 
     console.log(
-      "Remote Stream:",
-      remoteStreamUrl.getTracks().map((t) => t.kind)
+      "Remote Stream tracks:",
+      remoteStreamUrl.getVideoTracks().map((t) => ({
+        enabled: t.enabled,
+        readyState: t.readyState,
+        muted: t.muted,
+      }))
     );
 
     if (callType === "video" && remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = remoteStreamUrl;
-
-      remoteVideoRef.current
-        .play()
-        .catch((err) => console.log("Remote Play Error:", err));
+      remoteVideoRef.current.onloadedmetadata = () => {
+        console.log(
+          "Remote video size:",
+          remoteVideoRef.current.videoWidth,
+          remoteVideoRef.current.videoHeight
+        );
+      };
+      remoteVideoRef.current.play().catch((err) => console.log("Remote Play Error:", err));
     }
 
     if (remoteAudioRef.current) {
       remoteAudioRef.current.srcObject = remoteStreamUrl;
-
-      remoteAudioRef.current
-        .play()
-        .catch((err) => console.log("Remote Audio Error:", err));
+      remoteAudioRef.current.play().catch((err) => console.log("Remote Audio Error:", err));
     }
+    // re-run when callType changes too — this is what makes it retry once
+    // the <video> element actually exists in the DOM
   }, [remoteStreamUrl, callType]);
 
   if (callStatus === "idle") return null;
 
   return (
     <div className="fixed inset-0 bg-black text-white flex flex-col justify-between overflow-hidden z-50">
-
       {errorMsg && (
         <div className="absolute top-5 left-1/2 -translate-x-1/2 bg-red-500 px-4 py-2 rounded-lg z-50">
           {errorMsg}
         </div>
       )}
 
-      {/* Remote Video */}
-      {callType === "video" &&
-        callStatus === "connected" &&
-        remoteStreamUrl && (
-          <video
-            ref={remoteVideoRef}
-            autoPlay
-            playsInline
-            className="absolute inset-0 w-full h-full object-cover bg-black"
-          />
-        )}
+      {/* Remote Video — always mounted for video calls once we have a remote stream,
+          regardless of callStatus. This is what lets the ref exist in time. */}
+      {callType === "video" && remoteStreamUrl && (
+        <video
+          ref={remoteVideoRef}
+          autoPlay
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover bg-black"
+        />
+      )}
 
       {/* Remote Audio */}
       <audio ref={remoteAudioRef} autoPlay playsInline />
 
-      {/* Audio Call Avatar */}
+      {/* Avatar — shown for audio calls, or while we don't yet have a remote video stream */}
       {(callType === "audio" || !remoteStreamUrl) && (
         <div className="relative z-10 flex flex-col items-center mt-20">
           <img
@@ -140,11 +103,7 @@ const CallModal = () => {
             alt=""
             className="w-28 h-28 rounded-full object-cover border-4 border-white/20"
           />
-
-          <h2 className="text-2xl font-semibold mt-4">
-            {remoteUser?.fullName}
-          </h2>
-
+          <h2 className="text-2xl font-semibold mt-4">{remoteUser?.fullName}</h2>
           <p className="text-white/70 mt-2">
             {callStatus === "calling" && "Calling..."}
             {callStatus === "ringing" && `Incoming ${callType} call`}
@@ -166,7 +125,6 @@ const CallModal = () => {
 
       {/* Controls */}
       <div className="relative z-20 flex justify-center items-center gap-5 mb-10">
-
         {callStatus === "ringing" ? (
           <>
             <button
@@ -175,7 +133,6 @@ const CallModal = () => {
             >
               <PhoneOff size={28} />
             </button>
-
             <button
               onClick={acceptCall}
               className="w-16 h-16 rounded-full bg-green-600 flex items-center justify-center"
@@ -197,11 +154,7 @@ const CallModal = () => {
                 onClick={toggleCamera}
                 className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center"
               >
-                {isCameraOff ? (
-                  <VideoOff size={24} />
-                ) : (
-                  <Video size={24} />
-                )}
+                {isCameraOff ? <VideoOff size={24} /> : <Video size={24} />}
               </button>
             )}
 
