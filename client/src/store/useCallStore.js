@@ -1,44 +1,44 @@
 import { create } from "zustand";
 import { getSocket } from "../lib/socket";
- 
+
 const ICE_SERVERS = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
   ],
 };
- 
+
 let peerConnection = null;
 let localStream = null;
 let pendingOffer = null; // { callId, sdp } — holds an offer that arrived before peerConnection was ready
 let pendingIceCandidates = []; // candidates that arrive before peerConnection is ready
- 
+
 const genCallId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
- 
+
 export const useCallStore = create((set, get) => ({
   // idle | calling | ringing | connected
   callStatus: "idle",
- 
+
   callId: null,
   callType: null, // "audio" | "video"
- 
+
   remoteUser: null, // { id, fullName, profilePic } — the other party
- 
+
   localStreamUrl: null,
   remoteStreamUrl: null,
- 
+
   isMuted: false,
   isCameraOff: false,
- 
+
   errorMsg: null,
- 
+
   // ===========================================
   // INIT SOCKET LISTENERS (call once on app mount)
   // ===========================================
   initCallSocket: () => {
     const socket = getSocket();
     if (!socket) return;
- 
+
     socket.off("call:incoming");
     socket.off("call:accepted");
     socket.off("call:rejected");
@@ -47,14 +47,14 @@ export const useCallStore = create((set, get) => ({
     socket.off("call:ice-candidate");
     socket.off("call:ended");
     socket.off("call:unavailable");
- 
+
     socket.on("call:incoming", ({ callId, type, caller }) => {
       // Ignore if already in a call
       if (get().callStatus !== "idle") {
         socket.emit("call:reject", { callId });
         return;
       }
- 
+
       set({
         callStatus: "ringing",
         callId,
@@ -66,19 +66,19 @@ export const useCallStore = create((set, get) => ({
         },
       });
     });
- 
+
     socket.on("call:accepted", async ({ callId }) => {
       if (get().callId !== callId) return;
       await get()._createOffer();
     });
- 
+
     socket.on("call:rejected", ({ callId }) => {
       if (get().callId !== callId) return;
       get()._cleanup();
       set({ callStatus: "idle", callId: null, errorMsg: "Call declined" });
       setTimeout(() => set({ errorMsg: null }), 3000);
     });
- 
+
     socket.on("call:unavailable", ({ callId }) => {
       if (get().callId !== callId) return;
       get()._cleanup();
@@ -89,18 +89,18 @@ export const useCallStore = create((set, get) => ({
       });
       setTimeout(() => set({ errorMsg: null }), 3000);
     });
- 
-    // ---- FIX: queue the offer if peerConnection isn't ready yet ----
+
+    // queue the offer if peerConnection isn't ready yet
     socket.on("call:offer", async ({ callId, sdp }) => {
       if (get().callId !== callId) return;
- 
+
+      console.log("[call:offer] received", { callId, hasPeerConnection: !!peerConnection });
+
       if (!peerConnection) {
-        // getUserMedia / _setupPeerConnection hasn't finished yet on this side.
-        // Save the offer so _setupPeerConnection can process it once ready.
         pendingOffer = { callId, sdp };
         return;
       }
- 
+
       await peerConnection.setRemoteDescription(sdp);
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
@@ -109,56 +109,61 @@ export const useCallStore = create((set, get) => ({
         sdp: peerConnection.localDescription,
       });
     });
- 
+
     socket.on("call:answer", async ({ callId, sdp }) => {
       if (get().callId !== callId || !peerConnection) return;
+      console.log("[call:answer] received", { callId });
       await peerConnection.setRemoteDescription(sdp);
       set({ callStatus: "connected" });
     });
- 
-    // ---- FIX: queue ICE candidates if peerConnection isn't ready yet ----
+
+    // queue ICE candidates if peerConnection isn't ready yet
     socket.on("call:ice-candidate", async ({ callId, candidate }) => {
       if (get().callId !== callId || !candidate) return;
- 
+
       if (!peerConnection) {
         pendingIceCandidates.push(candidate);
         return;
       }
- 
+
       try {
         await peerConnection.addIceCandidate(candidate);
       } catch (err) {
         console.log("ICE candidate error", err);
       }
     });
- 
+
     socket.on("call:ended", ({ callId }) => {
       if (get().callId !== callId) return;
       get()._cleanup();
       set({ callStatus: "idle", callId: null, remoteUser: null });
     });
   },
- 
+
   // ===========================================
   // START A CALL (caller side)
   // ===========================================
   startCall: async (calleeUser, type) => {
     const socket = getSocket();
     if (!socket || get().callStatus !== "idle") return;
- 
+
     const callId = genCallId();
- 
+
     try {
       localStream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: type === "video",
       });
+      console.log(
+        "[startCall] got local stream, tracks:",
+        localStream.getTracks().map((t) => t.kind)
+      );
     } catch (err) {
       set({ errorMsg: "Camera/Microphone permission denied" });
       setTimeout(() => set({ errorMsg: null }), 3000);
       return;
     }
- 
+
     set({
       callStatus: "calling",
       callId,
@@ -170,16 +175,16 @@ export const useCallStore = create((set, get) => ({
       },
       localStreamUrl: localStream,
     });
- 
+
     get()._setupPeerConnection(callId);
- 
+
     socket.emit("call:invite", {
       calleeId: calleeUser._id || calleeUser.id,
       type,
       callId,
     });
   },
- 
+
   // ===========================================
   // ACCEPT INCOMING CALL (callee side)
   // ===========================================
@@ -187,43 +192,47 @@ export const useCallStore = create((set, get) => ({
     const socket = getSocket();
     const { callId, callType } = get();
     if (!socket || !callId) return;
- 
+
     try {
       localStream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: callType === "video",
       });
+      console.log(
+        "[acceptCall] got local stream, tracks:",
+        localStream.getTracks().map((t) => t.kind)
+      );
     } catch (err) {
       set({ errorMsg: "Camera/Microphone permission denied" });
       get().rejectCall();
       return;
     }
- 
+
     set({ localStreamUrl: localStream });
- 
+
     get()._setupPeerConnection(callId);
- 
+
     socket.emit("call:accept", { callId });
   },
- 
+
   rejectCall: () => {
     const socket = getSocket();
     const { callId } = get();
     if (socket && callId) socket.emit("call:reject", { callId });
- 
+
     get()._cleanup();
     set({ callStatus: "idle", callId: null, remoteUser: null });
   },
- 
+
   endCall: () => {
     const socket = getSocket();
     const { callId } = get();
     if (socket && callId) socket.emit("call:end", { callId });
- 
+
     get()._cleanup();
     set({ callStatus: "idle", callId: null, remoteUser: null });
   },
- 
+
   toggleMute: () => {
     if (!localStream) return;
     const audioTrack = localStream.getAudioTracks()[0];
@@ -231,7 +240,7 @@ export const useCallStore = create((set, get) => ({
     audioTrack.enabled = !audioTrack.enabled;
     set({ isMuted: !audioTrack.enabled });
   },
- 
+
   toggleCamera: () => {
     if (!localStream) return;
     const videoTrack = localStream.getVideoTracks()[0];
@@ -239,19 +248,20 @@ export const useCallStore = create((set, get) => ({
     videoTrack.enabled = !videoTrack.enabled;
     set({ isCameraOff: !videoTrack.enabled });
   },
- 
+
   // ===========================================
   // INTERNAL HELPERS
   // ===========================================
   _setupPeerConnection: (callId) => {
     const socket = getSocket();
- 
+
     peerConnection = new RTCPeerConnection(ICE_SERVERS);
- 
+
     localStream.getTracks().forEach((track) => {
+      console.log("[_setupPeerConnection] adding local track:", track.kind);
       peerConnection.addTrack(track, localStream);
     });
- 
+
     peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
         socket.emit("call:ice-candidate", {
@@ -260,12 +270,19 @@ export const useCallStore = create((set, get) => ({
         });
       }
     };
- 
+
     peerConnection.ontrack = (event) => {
+      console.log(
+        "[ontrack] fired. streams:",
+        event.streams.length,
+        "tracks in stream[0]:",
+        event.streams[0]?.getTracks().map((t) => t.kind)
+      );
       set({ remoteStreamUrl: event.streams[0] });
     };
- 
+
     peerConnection.onconnectionstatechange = () => {
+      console.log("[connectionState]", peerConnection?.connectionState);
       if (
         peerConnection?.connectionState === "disconnected" ||
         peerConnection?.connectionState === "failed"
@@ -273,8 +290,12 @@ export const useCallStore = create((set, get) => ({
         get().endCall();
       }
     };
- 
-    // ---- FIX: process an offer that arrived before we were ready ----
+
+    peerConnection.oniceconnectionstatechange = () => {
+      console.log("[iceConnectionState]", peerConnection?.iceConnectionState);
+    };
+
+    // process an offer that arrived before we were ready
     if (pendingOffer && pendingOffer.callId === callId) {
       const offer = pendingOffer;
       pendingOffer = null;
@@ -292,11 +313,10 @@ export const useCallStore = create((set, get) => ({
         }
       })();
     } else {
-      // clear any stale offer from a previous/different call
       pendingOffer = null;
     }
- 
-    // ---- FIX: flush any ICE candidates that arrived early ----
+
+    // flush any ICE candidates that arrived early
     if (pendingIceCandidates.length > 0) {
       const candidates = pendingIceCandidates;
       pendingIceCandidates = [];
@@ -309,21 +329,22 @@ export const useCallStore = create((set, get) => ({
       });
     }
   },
- 
+
   _createOffer: async () => {
     const socket = getSocket();
     const { callId } = get();
     if (!peerConnection || !callId) return;
- 
+
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
+    console.log("[_createOffer] sending offer");
     socket.emit("call:offer", { callId, sdp: peerConnection.localDescription });
   },
- 
+
   _cleanup: () => {
     pendingOffer = null;
     pendingIceCandidates = [];
- 
+
     if (peerConnection) {
       peerConnection.close();
       peerConnection = null;
@@ -341,4 +362,3 @@ export const useCallStore = create((set, get) => ({
     });
   },
 }));
- 
