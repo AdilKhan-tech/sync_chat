@@ -8,7 +8,29 @@ import {
   VideoOff,
 } from "lucide-react";
 import { useCallStore } from "../store/useCallStore";
-useEffect(() => {
+
+const CallModal = () => {
+  const {
+    callStatus,
+    callType,
+    remoteUser,
+    localStreamUrl,
+    remoteStreamUrl,
+    isMuted,
+    isCameraOff,
+    errorMsg,
+    acceptCall,
+    rejectCall,
+    endCall,
+    toggleMute,
+    toggleCamera,
+  } = useCallStore();
+
+  const localVideoRef = useRef(null);
+  const remoteVideoRef = useRef(null);
+  const remoteAudioRef = useRef(null);
+
+  useEffect(() => {
   if (!remoteVideoRef.current || !remoteStreamUrl) return;
 
   console.log("REMOTE STREAM:", remoteStreamUrl);
@@ -32,26 +54,6 @@ useEffect(() => {
     remoteVideoRef.current.play();
   };
 }, [remoteStreamUrl]);
-const CallModal = () => {
-  const {
-    callStatus,
-    callType,
-    remoteUser,
-    localStreamUrl,
-    remoteStreamUrl,
-    isMuted,
-    isCameraOff,
-    errorMsg,
-    acceptCall,
-    rejectCall,
-    endCall,
-    toggleMute,
-    toggleCamera,
-  } = useCallStore();
-
-  const localVideoRef = useRef(null);
-  const remoteVideoRef = useRef(null);
-  const remoteAudioRef = useRef(null);
 
   // Local Video
   useEffect(() => {
