@@ -8,7 +8,30 @@ import {
   VideoOff,
 } from "lucide-react";
 import { useCallStore } from "../store/useCallStore";
+useEffect(() => {
+  if (!remoteVideoRef.current || !remoteStreamUrl) return;
 
+  console.log("REMOTE STREAM:", remoteStreamUrl);
+
+  console.log(
+    "VIDEO TRACKS:",
+    remoteStreamUrl.getVideoTracks().map((t) => ({
+      enabled: t.enabled,
+      readyState: t.readyState,
+      muted: t.muted,
+    }))
+  );
+
+  remoteVideoRef.current.srcObject = remoteStreamUrl;
+
+  remoteVideoRef.current.onloadedmetadata = () => {
+    console.log("VIDEO SIZE");
+    console.log("Width:", remoteVideoRef.current.videoWidth);
+    console.log("Height:", remoteVideoRef.current.videoHeight);
+
+    remoteVideoRef.current.play();
+  };
+}, [remoteStreamUrl]);
 const CallModal = () => {
   const {
     callStatus,
