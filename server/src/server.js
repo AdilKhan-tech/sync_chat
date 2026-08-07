@@ -1,3 +1,4 @@
+
 import express from "express";
 import cookieParser from "cookie-parser";
 import path from "path";
@@ -19,8 +20,28 @@ const httpServer = createServer(app);
 
 const PORT = ENV.PORT || 5000;
 
-// CORS FIRST — before body parsers, so error responses also get CORS headers
-app.use(cors({ origin: ENV.CLIENT_URL, credentials: true }));
+// ---- CORS FIRST — before body parsers, so error responses also get CORS headers ----
+// Allow production frontend AND local dev (Vite) origins.
+const allowedOrigins = [
+  ENV.CLIENT_URL, // production, e.g. https://sync-chat-three.vercel.app
+  "http://localhost:5173", // local Vite dev server
+  "http://127.0.0.1:5173",
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // origin is undefined for tools like curl/Postman/server-to-server calls — allow those through
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.log("Blocked by CORS:", origin);
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  })
+);
 
 // Increase limits for base64 video/image uploads
 app.use(express.json({ limit: "50mb" }));
@@ -57,3 +78,4 @@ const startServer = async () => {
 };
 
 startServer();
+
