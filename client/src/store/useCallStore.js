@@ -281,13 +281,31 @@ export const useCallStore = create((set, get) => ({
       set({ remoteStreamUrl: event.streams[0] });
     };
 
+    let disconnectTimeout = null;
+
     peerConnection.onconnectionstatechange = () => {
       console.log("[connectionState]", peerConnection?.connectionState);
-      if (
-        peerConnection?.connectionState === "disconnected" ||
-        peerConnection?.connectionState === "failed"
-      ) {
+
+      if (peerConnection?.connectionState === "connected") {
+        // agar recover ho gaya, pending disconnect timer cancel karo
+        if (disconnectTimeout) {
+          clearTimeout(disconnectTimeout);
+          disconnectTimeout = null;
+        }
+      }
+
+      if (peerConnection?.connectionState === "failed") {
+        // failed ka matlab permanent hai, turant end karo
         get().endCall();
+      }
+
+      if (peerConnection?.connectionState === "disconnected") {
+        // disconnected transient ho sakta hai — 5 second wait karo recovery ke liye
+        disconnectTimeout = setTimeout(() => {
+          if (peerConnection?.connectionState === "disconnected") {
+            get().endCall();
+          }
+        }, 5000);
       }
     };
 
