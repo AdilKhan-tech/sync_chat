@@ -26,6 +26,20 @@ const CallModal = () => {
     toggleCamera,
   } = useCallStore();
 
+  useEffect(() => {
+  if (!remoteStreamUrl) return;
+
+  console.log("REMOTE STREAM OBJECT:", remoteStreamUrl);
+  console.log(
+    "VIDEO TRACKS:",
+    remoteStreamUrl.getVideoTracks().map((t) => ({
+      enabled: t.enabled,
+      readyState: t.readyState,
+      muted: t.muted,
+    }))
+  );
+}, [remoteStreamUrl]);
+
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const remoteAudioRef = useRef(null);
